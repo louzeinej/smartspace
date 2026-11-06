@@ -1,0 +1,44 @@
+import 'package:path/path.dart';
+import 'package:sqflite/sqflite.dart';
+
+import '../reservations/data/reservation_database.dart';
+
+/// Base SQLite unique de SmartSpace, partagée par les 5 modules.
+///
+/// Chaque module fournit sa fonction `createTables(db)` et l'ajoute
+/// dans [_onCreate]. Augmenter [_version] et compléter [_onUpgrade]
+/// quand un module ajoute des tables après une première installation.
+class DatabaseHelper {
+  DatabaseHelper._();
+  static final DatabaseHelper instance = DatabaseHelper._();
+
+  static const _nom = 'smartspace.db';
+  static const _version = 1;
+
+  Database? _db;
+
+  Future<Database> get database async {
+    _db ??= await openDatabase(
+      join(await getDatabasesPath(), _nom),
+      version: _version,
+      onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
+      onCreate: (db, _) => _onCreate(db),
+      onUpgrade: _onUpgrade,
+      onOpen: ReservationDatabase.ajouterSallesDemoSiVide,
+    );
+    return _db!;
+  }
+
+  Future<void> _onCreate(Database db) async {
+    // Module Utilisateurs (Youssef Messoudi)      : à ajouter
+    // Module Projets et Tâches (Youssef Sghaier)  : à ajouter
+    await ReservationDatabase.createTables(db); // Module Réservations (Youssef Fadaoui)
+    // Module Networking (Manar Kalai)             : à ajouter
+    // Module Événements et Club (Louzeine Aloui)  : à ajouter
+  }
+
+  Future<void> _onUpgrade(Database db, int ancienne, int nouvelle) async {
+    // Les CREATE TABLE IF NOT EXISTS permettent de rejouer la création sans risque.
+    await _onCreate(db);
+  }
+}
