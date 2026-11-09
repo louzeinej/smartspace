@@ -29,8 +29,12 @@ class _RolesScreenState extends State<RolesScreen> {
     _reload();
   }
 
-  void _reload() =>
-      setState(() => _future = UserDao.instance.getAll());
+  void _reload() {
+    // Corps de bloc : ne pas retourner le Future depuis setState.
+    setState(() {
+      _future = UserDao.instance.getAll();
+    });
+  }
 
   Future<void> _changeRole(User user, UserRole newRole) async {
     if (newRole == user.role) return;

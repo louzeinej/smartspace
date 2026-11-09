@@ -37,8 +37,13 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
         .then((ok) => mounted ? setState(() => _apiOnline = ok) : null);
   }
 
-  void _reload() =>
-      setState(() => _future = UserDao.instance.findById(widget.userId));
+  void _reload() {
+    // Corps de bloc (et non flèche) : la closure ne doit rien RETOURNER,
+    // sinon setState reçoit un Future → crash « callback returned a Future ».
+    setState(() {
+      _future = UserDao.instance.findById(widget.userId);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
