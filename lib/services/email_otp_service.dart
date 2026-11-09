@@ -1,69 +1,112 @@
-import 'dart:convert';
-
 import 'package:http/http.dart' as http;
+import 'package:mailer/mailer.dart';
+import 'package:mailer/smtp_server.dart';
 
-/// ENVOI RÉEL D'OTP PAR EMAIL (valeur ajoutée) via l'API Brevo
-/// (ex-Sendinblue) — offre gratuite : 300 emails/jour, sans carte
-/// bancaire : https://app.brevo.com  →  SMTP & API → Clés API.
+/// ENVOI RÉEL D'OTP PAR EMAIL — deux fournisseurs au choix :
 ///
-/// ⚙️ MODE D'EMPLOI :
-///  1. Crée un compte Brevo et génère une clé API ;
-///  2. Colle-la dans [apiKey] ci-dessous ;
-///  3. C'est tout : les codes de réinitialisation partiront par vrai
-///     email. Sans clé (chaîne vide), l'app reste en mode « email
-///     simulé » (démo soutenance).
+/// 🅰 GMAIL SMTP (le plus simple si tu as un compte Gmail) :
+///    1. Active la validation en 2 étapes sur ton compte Google ;
+///    2. https://myaccount.google.com/apppasswords → génère un
+///       « mot de passe d'application » (16 caractères) ;
+///    3. Colle ton adresse dans [gmailUser] et le mot de passe
+///       d'application dans [gmailAppPassword].
+///    ⚠️ Le mot de passe normal Gmail NE FONCTIONNE PAS (Google
+///    bloque les connexions SMTP non OAuth) — il FAUT un mot de
+///    passe d'application.
 ///
-/// 🔒 NOTE SÉCURITÉ (à citer en soutenance) : embarquer une clé API
-/// dans une app mobile n'est acceptable que pour un projet pédagogique.
-/// En production, l'envoi passerait par un petit backend qui détient
-/// la clé — l'app ne devrait jamais contenir de secret.
+/// 🅱 BREVO (API REST, 300 emails/jour gratuits) : colle ta clé
+///    `xkeysib-...` dans [brevoApiKey].
+///
+/// Sans aucune configuration → mode « email simulé » (démo).
+///
+/// 🔒 NOTE SÉCURITÉ (soutenance) : embarquer des identifiants SMTP
+/// dans une app mobile n'est acceptable qu'en projet pédagogique ;
+/// en production, l'envoi passerait par un backend détenant les
+/// secrets.
 abstract final class EmailOtpService {
-  /// Colle ta clé API Brevo ici (v3), ex. 'xkeysib-abc123...'
-  static const String apiKey = '';
+  // ── Configuration Gmail SMTP ──────────────────────────────────────
+  static const String gmailUser = ''; // ex. 'youssef.messoudi@gmail.com'
+  static const String gmailAppPassword = ''; // 16 caractères, espaces OK
 
-  static const String _endpoint = 'https://api.brevo.com/v3/smtp/email';
-  static const String _senderName = 'SmartSpace';
-  static const String _senderEmail = 'no-reply@smartspace.tn';
+  // ── Configuration Brevo (API) ─────────────────────────────────────
+  static const String brevoApiKey = ''; // ex. 'xkeysib-abc123...'
 
-  /// Vrai si une clé est configurée → l'app enverra de vrais emails.
-  static bool get isConfigured => apiKey.startsWith('xkeysib-');
+  static bool get _gmailConfigured =>
+      gmailUser.contains('@') && gmailAppPassword.isNotEmpty;
+  static bool get _brevoConfigured => brevoApiKey.startsWith('xkeysib-');
+
+  /// Vrai si au moins un fournisseur est configuré.
+  static bool get isConfigured => _gmailConfigured || _brevoConfigured;
 
   /// Envoie le code OTP à [toEmail]. Retourne true si l'email est parti.
-  /// En cas d'échec (réseau, quota, clé invalide), retourne false →
-  /// l'app retombera sur l'email simulé.
+  /// En cas d'échec (réseau, auth), retourne false → l'app retombera
+  /// sur l'email simulé.
   static Future<bool> sendOtp({
     required String toEmail,
     required String toName,
     required String code,
   }) async {
-    if (!isConfigured) return false;
     try {
-      final res = await http
-          .post(
-            Uri.parse(_endpoint),
-            headers: {
-              'api-key': apiKey,
-              'content-type': 'application/json',
-              'accept': 'application/json',
-            },
-            body: jsonEncode({
-              'sender': {'name': _senderName, 'email': _senderEmail},
-              'to': [
-                {'email': toEmail, 'name': toName},
-              ],
-              'subject': 'SmartSpace — votre code de réinitialisation',
-              'textContent':
-                  'Bonjour $toName,\n\n'
-                  'Votre code de réinitialisation SmartSpace est : $code\n\n'
-                  'Il est valable 10 minutes. Si vous n\'êtes pas à '
-                  'l\'origine de cette demande, ignorez ce message.\n\n'
-                  '— L\'équipe SmartSpace',
-            }),
-          )
-          .timeout(const Duration(seconds: 8));
-      return res.statusCode == 201 || res.statusCode == 200;
+      // Gmail prioritaire s'il est configuré, sinon Brevo.
+      if (_gmailConfigured) {
+        return await _sendViaGmail(toEmail, toName, code);
+      }
+      if (_brevoConfigured) {
+        return await _sendViaBrevo(toEmail, toName, code);
+      }
+      return false;
     } catch (_) {
-      return false; // réseau/quota → fallback simulation
+      return false; // réseau/auth → fallback simulation
     }
+  }
+
+  static String _emailBody(String toName, String code) =>
+      'Bonjour $toName,\n\n'
+      'Votre code de réinitialisation SmartSpace est : $code\n\n'
+      'Il est valable 10 minutes. Si vous n\'êtes pas à l\'origine de '
+      'cette demande, ignorez ce message.\n\n'
+      '— L\'équipe SmartSpace';
+
+  static const String _subject =
+      'SmartSpace — votre code de réinitialisation';
+
+  // ── Gmail SMTP (smtp.gmail.com:465, mot de passe d'application) ──
+  static Future<bool> _sendViaGmail(String toEmail, String toName, String code) async {
+    final smtp = SmtpServer(
+      'smtp.gmail.com',
+      port: 465,
+      ssl: true,
+      username: gmailUser,
+      password: gmailAppPassword,
+    );
+    final message = Message()
+      ..from = Address(gmailUser, 'SmartSpace')
+      ..recipients.add(toEmail)
+      ..subject = _subject
+      ..text = _emailBody(toName, code);
+    // send() lève une exception en cas d'échec SMTP ; si elle ne
+    // lève pas, le message est parti.
+    await send(message, smtp);
+    return true;
+  }
+
+  // ── Brevo (API REST) ─────────────────────────────────────────────
+  static Future<bool> _sendViaBrevo(String toEmail, String toName, String code) async {
+    final res = await http
+        .post(
+          Uri.parse('https://api.brevo.com/v3/smtp/email'),
+          headers: {
+            'api-key': brevoApiKey,
+            'content-type': 'application/json',
+            'accept': 'application/json',
+          },
+          body:
+              '{"sender":{"name":"SmartSpace","email":"$gmailUser"},'
+              '"to":[{"email":"$toEmail","name":"$toName"}],'
+              '"subject":"$_subject",'
+              '"textContent":"${_emailBody(toName, code).replaceAll('\n', '\\n')}"',
+        )
+        .timeout(const Duration(seconds: 8));
+    return res.statusCode == 201 || res.statusCode == 200;
   }
 }
