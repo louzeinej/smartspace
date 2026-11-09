@@ -77,8 +77,10 @@ class UserDatabase {
 
     final demo = [
       // [nom, email, mot de passe, rôle, graine avatar, téléphone]
+      // Rôles alignés sur l'organisation de l'équipe (cahier des
+      // charges §4) : Messoudi gère comptes/rôles -> Administrateur.
       ['Youssef Messoudi', 'dev@smartspace.tn', 'Dev12345',
-          UserRole.developpeur.index, 'youssef-dev', '20111223'],
+          UserRole.administrateur.index, 'youssef-dev', '20111223'],
       ['Youssef Sghaier', 'scrum@smartspace.tn', 'Scrum123',
           UserRole.scrumMaster.index, 'youssef-scrum', '20333445'],
       ['Youssef Fadaoui', 'admin@smartspace.tn', 'Admin123',
