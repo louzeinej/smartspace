@@ -63,7 +63,34 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       return;
     }
     setState(() => _codeSent = true);
-    // Simulation de la réception de l'email contenant le code.
+
+    if (res.sentByEmail) {
+      // ✅ VRAI EMAIL envoyé (API Brevo) : le code n'est PAS affiché.
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('📧 Email envoyé'),
+          content: const Text(
+            'Un email contenant votre code de vérification (6 chiffres) '
+            'vient d\'être envoyé à votre adresse.\n\n'
+            'Consultez votre boîte de réception (et vos spams) — le code '
+            'est valable 10 minutes.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('OK',
+                  style: TextStyle(color: AppColors.primary)),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    // 📬 SIMULATION (pas de clé API / échec d'envoi) : le code est
+    // affiché dans une boîte « email simulé » pour la démo.
     await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -71,9 +98,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         content: Text(
           'Bonjour,\n\nVotre code de vérification SmartSpace est :\n\n'
           '   ${res.message}\n\n'
-          '(Code valable 10 minutes — en production, il serait envoyé '
-          'par le serveur mail de l\'entreprise. Il est généré par le '
-          'web service random.org.)',
+          '(Code valable 10 minutes — mode démo sans clé API email. '
+          'Le code est généré par le web service random.org.)',
           textAlign: TextAlign.start,
         ),
         actions: [

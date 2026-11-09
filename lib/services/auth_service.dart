@@ -6,6 +6,7 @@ import '../database/user_dao.dart';
 import '../models/user_model.dart';
 import '../models/user_role.dart';
 import 'avatar_service.dart';
+import 'email_otp_service.dart';
 import 'verification_code_service.dart';
 
 /// Cœur MÉTIER du module : inscription, connexion, session.
@@ -203,12 +204,22 @@ class AuthService {
       code: generated.code,
       expires: DateTime.now().add(_codeValidity),
     );
-    // Le code voyage dans AuthResult.message uniquement pour la démo
-    // (aucun serveur mail dans une application offline).
+
+    // ENVOI RÉEL si une clé API email (Brevo) est configurée.
+    // Sinon (ou en cas d'échec d'envoi), le code est renvoyé à l'UI
+    // pour l'« email simulé » de la démo.
+    final reallySent = await EmailOtpService.sendOtp(
+      toEmail: user.email,
+      toName: user.fullName,
+      code: generated.code,
+    );
     return AuthResult._(
       ok: true,
       user: user,
-      message: generated.code,
+      // message = code quand il n'a PAS pu être envoyé (simulation),
+      // null quand l'email réel est parti (l'UI ne l'affiche pas !).
+      message: reallySent ? null : generated.code,
+      sentByEmail: reallySent,
     );
   }
 
@@ -301,8 +312,17 @@ class AuthService {
 
 /// Valeur de retour des opérations d'authentification.
 class AuthResult {
-  AuthResult._({required this.ok, this.user, this.message});
+  AuthResult._({
+    required this.ok,
+    this.user,
+    this.message,
+    this.sentByEmail = false,
+  });
   final bool ok;
   final User? user;
   final String? message;
+
+  /// Vrai si le code a réellement été envoyé par email (API Brevo) :
+  /// l'UI doit alors MASQUER le code et inviter à consulter sa boîte.
+  final bool sentByEmail;
 }
