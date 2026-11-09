@@ -64,9 +64,9 @@ class UserDatabase {
   /// Comptes de démonstration (créés uniquement à la première
   /// installation — supprimer l'appel pour la version de production).
   static const demoCredentials = {
-    'admin@smartspace.tn': 'Admin123',
+    'admin@smartspace.tn': 'Admin123', // Youssef Messoudi — Administrateur
     'scrum@smartspace.tn': 'Scrum123',
-    'dev@smartspace.tn': 'Dev12345',
+    'fadaoui@smartspace.tn': 'Fadaoui1',
     'uiux@smartspace.tn': 'Uiux1234',
     'louzeine@smartspace.tn': 'Louz1234',
   };
@@ -77,14 +77,15 @@ class UserDatabase {
 
     final demo = [
       // [nom, email, mot de passe, rôle, graine avatar, téléphone]
-      // Rôles alignés sur l'organisation de l'équipe (cahier des
-      // charges §4) : Messoudi gère comptes/rôles -> Administrateur.
-      ['Youssef Messoudi', 'dev@smartspace.tn', 'Dev12345',
-          UserRole.administrateur.index, 'youssef-dev', '20111223'],
+      // Youssef Messoudi (module Utilisateurs) : Administrateur unique.
+      // Fadaoui démarre Employé — démo : l'Admin le promeut depuis la
+      // Gestion des rôles pour qu'il puisse référencer des salles.
+      ['Youssef Messoudi', 'admin@smartspace.tn', 'Admin123',
+          UserRole.administrateur.index, 'youssef-admin', '20111223'],
       ['Youssef Sghaier', 'scrum@smartspace.tn', 'Scrum123',
           UserRole.scrumMaster.index, 'youssef-scrum', '20333445'],
-      ['Youssef Fadaoui', 'admin@smartspace.tn', 'Admin123',
-          UserRole.administrateur.index, 'youssef-admin', '20555667'],
+      ['Youssef Fadaoui', 'fadaoui@smartspace.tn', 'Fadaoui1',
+          UserRole.employe.index, 'youssef-fadaoui', '20555667'],
       ['Manar Kalai', 'uiux@smartspace.tn', 'Uiux1234',
           UserRole.uiuxDesigner.index, 'manar-uiux', '98776655'],
       ['Louzeine Aloui', 'louzeine@smartspace.tn', 'Louz1234',
