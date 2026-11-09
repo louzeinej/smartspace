@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../core/session.dart';
 import '../database/user_dao.dart';
 import '../models/user_model.dart';
 import '../models/user_role.dart';
@@ -147,6 +148,9 @@ class _EditUserScreenState extends State<EditUserScreen> {
                     },
                   ),
                   const SizedBox(height: 20),
+                  // Règle d'accès : seul un Administrateur connecté peut
+                  // changer le rôle d'un compte (promotion/rétrogradation).
+                  if (Session.estAdmin) ...[
                   const Text('Rôle',
                       style: TextStyle(
                           fontSize: 14, fontWeight: FontWeight.w500)),
@@ -174,6 +178,18 @@ class _EditUserScreenState extends State<EditUserScreen> {
                         ),
                     ],
                   ),
+                  ] else
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        "Rôle : ${widget.user.role.label} "
+                        '(modifiable uniquement par un Administrateur)',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.secondary.withValues(alpha: 0.55),
+                        ),
+                      ),
+                    ),
                 ] else ...[
                   TextFormField(
                     controller: _oldPwdCtrl,

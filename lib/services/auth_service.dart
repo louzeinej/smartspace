@@ -52,11 +52,20 @@ class AuthService {
       return failure('Un compte existe déjà avec cet email.');
     }
 
+    // Règle d'accès métier : le PREMIER compte créé devient
+    // Administrateur (amorçage du système). Ensuite, personne ne peut
+    // s'auto-attribuer le rôle Administrateur à l'inscription — seule
+    // une promotion par un Administrateur existant est possible
+    // (voir EditUserScreen).
+    final userCount = await _dao.countAll();
+    final effectiveRole =
+        userCount == 0 ? UserRole.administrateur : role;
+
     final user = User(
       fullName: fullName.trim(),
       email: normalizedEmail,
       passwordHash: _hash(password),
-      role: role,
+      role: effectiveRole,
       avatarSeed: AvatarService.randomSeed(),
       createdAt: DateTime.now(),
     );

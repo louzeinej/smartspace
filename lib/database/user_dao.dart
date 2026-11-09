@@ -65,6 +65,13 @@ class UserDao {
     return rows.isEmpty ? null : User.fromMap(rows.first);
   }
 
+  /// Nombre total d'utilisateurs (amorçage du premier Administrateur).
+  Future<int> countAll() async {
+    final db = await _db;
+    final res = await db.rawQuery('SELECT COUNT(*) AS n FROM users');
+    return res.first['n'] as int;
+  }
+
   /// Nombre d'utilisateurs par rôle (statistiques du tableau de bord).
   Future<Map<int, int>> countByRole() async {
     final db = await _db;

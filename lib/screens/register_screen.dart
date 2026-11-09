@@ -166,7 +166,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
                 const SizedBox(height: 4),
                 Text(
-                  'Le rôle détermine les tâches qui peuvent t\'être confiées.',
+                  "Le rôle détermine les tâches qui peuvent t'être confiées. "
+                  'Le rôle Administrateur est attribué uniquement par un '
+                  'Administrateur.',
                   style: TextStyle(
                     fontSize: 12,
                     color: AppColors.secondary.withValues(alpha: 0.55),
@@ -177,8 +179,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
+                    // Le rôle Administrateur est volontairement absent :
+                    // il s'obtient par promotion, jamais à l'inscription.
                     for (final role in UserRole.values)
-                      ChoiceChip(
+                      if (role != UserRole.administrateur)
+                        ChoiceChip(
                         label: Text(role.label),
                         selected: _selectedRole == role,
                         onSelected: (_) =>
