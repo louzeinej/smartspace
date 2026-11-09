@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../../core/database_helper.dart';
@@ -57,6 +58,16 @@ class ProjetService {
   final Future<List<User>> Function() _lireUtilisateurs;
   final Acteur Function() _acteur;
 
+  /// Incrémenté après chaque écriture : les écrans ouverts se rechargent.
+  final changements = ValueNotifier<int>(0);
+
+  Acteur get acteur => _acteur();
+
+  bool get peutCreerProjet => ProjetAccess.peutCreerProjet(acteur.role);
+
+  bool peutGererProjet(Projet projet) => ProjetAccess.peutGererProjet(projet,
+      utilisateurId: acteur.utilisateurId, estAdmin: acteur.estAdmin);
+
   // --------------------------------------------------------------- Projets
 
   Future<List<Projet>> getProjets() async {
@@ -66,6 +77,14 @@ class ProjetService {
     return rows.map(Projet.fromMap).toList();
   }
 
+  /// Null si le projet a été supprimé entre-temps.
+  Future<Projet?> getProjet(int id) async {
+    final db = await _database;
+    final rows =
+        await db.query('projets', where: 'id = ?', whereArgs: [id], limit: 1);
+    return rows.isEmpty ? null : Projet.fromMap(rows.first);
+  }
+
   /// Le créateur est toujours l'acteur : les droits en dépendent.
   Future<int> creerProjet(Projet projet) async {
     final acteur = _acteur();
@@ -73,15 +92,13 @@ class ProjetService {
       throw AccesRefuseException(
           'Seuls un Scrum Master ou un administrateur peuvent créer un projet.');
     }
-    final db = await _database;
-    return db.insert(
-        'projets', {...projet.toMap(), 'createur_id': acteur.utilisateurId});
+    return _ecrire((txn) => txn.insert(
+        'projets', {...projet.toMap(), 'createur_id': acteur.utilisateurId}));
   }
 
   /// La date de création et le créateur ne changent jamais.
   Future<void> modifierProjet(Projet projet) async {
-    final db = await _database;
-    await db.transaction((txn) async {
+    await _ecrire((txn) async {
       await _exigerGestion(txn, projet.id!);
       await txn.update(
         'projets',
@@ -94,8 +111,7 @@ class ProjetService {
 
   /// Supprime le projet et ses tâches (ON DELETE CASCADE).
   Future<void> supprimerProjet(int id) async {
-    final db = await _database;
-    await db.transaction((txn) async {
+    await _ecrire((txn) async {
       await _exigerGestion(txn, id);
       await txn.delete('projets', where: 'id = ?', whereArgs: [id]);
     });
@@ -121,8 +137,7 @@ class ProjetService {
   /// Une nouvelle tâche n'est jamais affectée : seul [affecterA] le permet.
   Future<int> creerTache(Tache tache) async {
     _verifierPeriode(tache.dateDebut, tache.dateFin);
-    final db = await _database;
-    return db.transaction((txn) async {
+    return _ecrire((txn) async {
       await _exigerGestion(txn, tache.projetId);
       return txn.insert('taches', {...tache.toMap(), 'utilisateur_id': null});
     });
@@ -138,9 +153,8 @@ class ProjetService {
   Future<void> modifierTache(Tache tache,
       {bool retirerAffectation = false}) async {
     _verifierPeriode(tache.dateDebut, tache.dateFin);
-    final utilisateurs = await _utilisateursParId();
-    final db = await _database;
-    await db.transaction((txn) async {
+    final utilisateurs = await getUtilisateursParId();
+    await _ecrire((txn) async {
       final actuelle = await _lireTache(txn, tache.id!);
       await _exigerGestion(txn, actuelle.projetId);
 
@@ -181,9 +195,8 @@ class ProjetService {
   /// est alors revérifiée, comme dans [modifierTache].
   Future<void> changerStatut(int tacheId, StatutTache statut,
       {bool retirerAffectation = false}) async {
-    final utilisateurs = await _utilisateursParId();
-    final db = await _database;
-    await db.transaction((txn) async {
+    final utilisateurs = await getUtilisateursParId();
+    await _ecrire((txn) async {
       final actuelle = await _lireTache(txn, tacheId);
       final projet = await _lireProjet(txn, actuelle.projetId);
       final acteur = _acteur();
@@ -218,8 +231,7 @@ class ProjetService {
   }
 
   Future<void> supprimerTache(int id) async {
-    final db = await _database;
-    await db.transaction((txn) async {
+    await _ecrire((txn) async {
       final actuelle = await _lireTache(txn, id);
       await _exigerGestion(txn, actuelle.projetId);
       await txn.delete('taches', where: 'id = ?', whereArgs: [id]);
@@ -264,8 +276,7 @@ class ProjetService {
   /// Revérifie tout dans la transaction : l'écran peut afficher des données
   /// périmées au moment où l'affectation est confirmée.
   Future<void> affecterA(Tache tache, User utilisateur) async {
-    final db = await _database;
-    await db.transaction((txn) async {
+    await _ecrire((txn) async {
       final actuelle = await _lireTache(txn, tache.id!);
       await _exigerGestion(txn, actuelle.projetId);
       if (actuelle.statut.estTerminee) {
@@ -286,6 +297,13 @@ class ProjetService {
 
   // ---------------------------------------------------------------- Interne
 
+  Future<T> _ecrire<T>(Future<T> Function(Transaction txn) action) async {
+    final db = await _database;
+    final resultat = await db.transaction(action);
+    changements.value++;
+    return resultat;
+  }
+
   // TODO(Youssef Messoudi): quand le module Utilisateurs aura ajouté la
   // colonne, remplacer `true` par `utilisateur.disponible`. C'est le seul
   // endroit à changer.
@@ -293,7 +311,7 @@ class ProjetService {
 
   /// À appeler AVANT une transaction, jamais dedans : UserDao passe par la
   /// connexion principale, qui attendrait la fin de la transaction (blocage).
-  Future<Map<int, User>> _utilisateursParId() async =>
+  Future<Map<int, User>> getUtilisateursParId() async =>
       {for (final u in await _lireUtilisateurs()) u.id!: u};
 
   User _trouver(Map<int, User> utilisateurs, int id) =>
