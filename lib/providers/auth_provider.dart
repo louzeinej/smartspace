@@ -64,6 +64,18 @@ class AuthProvider extends ChangeNotifier {
   Future<int?> securityQuestionFor(String email) =>
       _auth.getSecurityQuestionFor(email);
 
+  /// Mot de passe oublié — méthode « code de vérification » (API).
+  Future<AuthResult> requestResetCode(String email) =>
+      _auth.requestResetCode(email);
+
+  Future<AuthResult> resetPasswordWithCode({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) =>
+      _auth.resetPasswordWithCode(
+          email: email, code: code, newPassword: newPassword);
+
   Future<AuthResult> resetPassword({
     required String email,
     required String answer,

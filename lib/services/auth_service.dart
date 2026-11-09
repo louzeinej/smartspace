@@ -6,6 +6,7 @@ import '../database/user_dao.dart';
 import '../models/user_model.dart';
 import '../models/user_role.dart';
 import 'avatar_service.dart';
+import 'verification_code_service.dart';
 
 /// Cœur MÉTIER du module : inscription, connexion, session.
 ///
@@ -163,6 +164,74 @@ class AuthService {
   }
 
   // ── MOT DE PASSE OUBLIÉ ───────────────────────────────────────────
+  // Codes de vérification en attente : email → (code, expiration).
+  // Conservés en mémoire (jamais en base) et valables 10 minutes.
+  static final Map<String, ({String code, DateTime expires})>
+      _pendingCodes = {};
+  static const _codeValidity = Duration(minutes: 10);
+
+  /// Demande un code de vérification pour un email.
+  /// Le code est généré par le web service random.org (valeur ajoutée),
+  /// avec fallback local hors-ligne. Dans une vraie entreprise, il
+  /// serait envoyé par email ; en démo, il est renvoyé à l'UI qui
+  /// l'affiche dans une boîte de dialogue « simulation email ».
+  Future<AuthResult> requestResetCode(String email) async {
+    final user = await _dao.findByEmail(email);
+    if (user == null) {
+      return failure('Aucun compte pour cet email.');
+    }
+    final generated = await VerificationCodeService.generate();
+    _pendingCodes[user.email] = (
+      code: generated.code,
+      expires: DateTime.now().add(_codeValidity),
+    );
+    // Le code voyage dans AuthResult.message uniquement pour la démo
+    // (aucun serveur mail dans une application offline).
+    return AuthResult._(
+      ok: true,
+      user: user,
+      message: generated.code,
+    );
+  }
+
+  /// Vérifie le code saisi pour un email donné.
+  bool checkResetCode(String email, String code) {
+    final pending = _pendingCodes[email.trim().toLowerCase()];
+    if (pending == null) return false;
+    if (DateTime.now().isAfter(pending.expires)) {
+      _pendingCodes.remove(email.trim().toLowerCase());
+      return false;
+    }
+    return pending.code == code.trim();
+  }
+
+  /// Réinitialisation par code vérifié : définit le nouveau mot de passe.
+  Future<AuthResult> resetPasswordWithCode({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) async {
+    if (!checkResetCode(email, code)) {
+      return failure('Code invalide ou expiré (validité 10 minutes).');
+    }
+    final user = await _dao.findByEmail(email);
+    if (user == null) return failure('Aucun compte pour cet email.');
+    final updated = User(
+      id: user.id,
+      fullName: user.fullName,
+      email: user.email,
+      passwordHash: _hash(newPassword),
+      role: user.role,
+      avatarSeed: user.avatarSeed,
+      createdAt: user.createdAt,
+      securityQuestion: user.securityQuestion,
+      securityAnswerHash: user.securityAnswerHash,
+    );
+    await _dao.update(updated);
+    _pendingCodes.remove(user.email);
+    return success(updated);
+  }
+
   /// Étape 1 : retrouver la question secrète d'un compte par email
   /// (retourne null si le compte n'existe pas ou n'a pas de question).
   Future<int?> getSecurityQuestionFor(String email) async {
