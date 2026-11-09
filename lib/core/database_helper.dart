@@ -2,6 +2,7 @@ import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../database/user_database.dart';
+import '../projets/data/projet_database.dart';
 import '../reservations/data/reservation_database.dart';
 
 /// Base SQLite unique de SmartSpace, partagée par les 5 modules.
@@ -14,7 +15,7 @@ class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._();
 
   static const _nom = 'smartspace.db';
-  static const _version = 4; // v4 : téléphone (reset par SMS simulé)
+  static const _version = 5; // v5 : tables projets et taches
 
   Database? _db;
 
@@ -34,7 +35,7 @@ class DatabaseHelper {
     // Module Utilisateurs (Youssef Messoudi)
     await UserDatabase.createTables(db);
     await UserDatabase.seedDemoUsers(db);
-    // Module Projets et Tâches (Youssef Sghaier)  : à ajouter
+    await ProjetDatabase.createTables(db); // Module Projets et Tâches (Youssef Sghaier)
     await ReservationDatabase.createTables(db); // Module Réservations (Youssef Fadaoui)
     // Module Networking (Manar Kalai)             : à ajouter
     // Module Événements et Club (Louzeine Aloui)  : à ajouter
