@@ -47,10 +47,30 @@ class AuthProvider extends ChangeNotifier {
     required String email,
     required String password,
     required UserRole role,
+    required int securityQuestion,
+    required String securityAnswer,
   }) async {
     return _auth.register(
-        fullName: fullName, email: email, password: password, role: role);
+      fullName: fullName,
+      email: email,
+      password: password,
+      role: role,
+      securityQuestion: securityQuestion,
+      securityAnswer: securityAnswer,
+    );
   }
+
+  /// « Mot de passe oublié » : question secrète du compte, puis reset.
+  Future<int?> securityQuestionFor(String email) =>
+      _auth.getSecurityQuestionFor(email);
+
+  Future<AuthResult> resetPassword({
+    required String email,
+    required String answer,
+    required String newPassword,
+  }) =>
+      _auth.resetPassword(
+          email: email, answer: answer, newPassword: newPassword);
 
   Future<AuthResult> changePassword(
       User user, String oldPassword, String newPassword) {

@@ -8,6 +8,7 @@ import '../models/user_role.dart';
 import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/user_card.dart';
+import 'assistant_screen.dart';
 import 'login_screen.dart';
 import 'user_detail_screen.dart';
 
@@ -34,6 +35,13 @@ class _UsersScreenState extends State<UsersScreen> {
       appBar: AppBar(
         title: const Text('Utilisateurs'),
         actions: [
+          IconButton(
+            tooltip: 'Assistant SmartSpace',
+            icon: const Icon(Icons.auto_awesome_rounded,
+                color: AppColors.primary),
+            onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const AssistantScreen())),
+          ),
           IconButton(
             tooltip: 'Déconnexion',
             icon: const Icon(Icons.logout_rounded),

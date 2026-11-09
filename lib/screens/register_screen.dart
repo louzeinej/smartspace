@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../database/user_database.dart' show kSecurityQuestions;
 import '../models/user_role.dart';
 import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
@@ -24,12 +25,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _passwordCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
   UserRole _selectedRole = UserRole.employe;
+  int _securityQuestion = 0;
+  final _answerCtrl = TextEditingController();
   bool _obscure = true;
   bool _loading = false;
   String? _error;
 
   @override
   void dispose() {
+    _answerCtrl.dispose();
     _nameCtrl.dispose();
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
@@ -48,6 +52,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
           email: _emailCtrl.text,
           password: _passwordCtrl.text,
           role: _selectedRole,
+          securityQuestion: _securityQuestion,
+          securityAnswer: _answerCtrl.text,
         );
     if (!mounted) return;
     setState(() => _loading = false);
@@ -158,6 +164,46 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ? 'Les mots de passe ne correspondent pas.'
                       : null,
                 ),
+                // ── Question secrète (réinitialisation du mot de passe) ──
+                const SizedBox(height: 22),
+                const Text('Question secrète',
+                    style: TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.w500)),
+                const SizedBox(height: 4),
+                Text(
+                  "Sert à réinitialiser ton mot de passe si tu l'oublies "
+                  "(l'application fonctionne hors-ligne, sans email).",
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.secondary.withValues(alpha: 0.55),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<int>(
+                  initialValue: _securityQuestion,
+                  decoration: const InputDecoration(
+                    prefixIcon: Icon(Icons.help_outline_rounded),
+                  ),
+                  items: [
+                    for (var i = 0; i < kSecurityQuestions.length; i++)
+                      DropdownMenuItem(
+                          value: i, child: Text(kSecurityQuestions[i])),
+                  ],
+                  onChanged: (v) =>
+                      setState(() => _securityQuestion = v ?? 0),
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: _answerCtrl,
+                  decoration: const InputDecoration(
+                    hintText: 'Votre réponse à la question secrète',
+                    prefixIcon: Icon(Icons.question_answer_outlined),
+                  ),
+                  validator: (v) => (v == null || v.trim().length < 2)
+                      ? 'Réponse obligatoire (2 caractères min.).'
+                      : null,
+                ),
+
                 const SizedBox(height: 22),
 
                 // ── Sélection du rôle ──

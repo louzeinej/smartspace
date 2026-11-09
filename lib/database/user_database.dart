@@ -3,6 +3,15 @@ import 'package:sqflite/sqflite.dart';
 
 import '../models/user_role.dart';
 
+/// Questions secrètes proposées à l'inscription pour la réinitialisation
+/// du mot de passe (application offline : pas d'envoi d'email possible,
+/// on vérifie une information que l'utilisateur seul connaît).
+const kSecurityQuestions = [
+  'Quel est le nom de votre équipe ?',
+  'Quel est le nom de votre première école ?',
+  'Quel est votre plat préféré ?',
+];
+
 /// Script SQL du module Utilisateurs (Youssef Messoudi).
 ///
 /// Suivant la convention du projet : chaque module expose une fonction
@@ -16,19 +25,37 @@ class UserDatabase {
   static Future<void> createTables(Database db) async {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS users (
-        id            INTEGER PRIMARY KEY AUTOINCREMENT,
-        fullName      TEXT    NOT NULL,
-        email         TEXT    NOT NULL UNIQUE,
-        passwordHash  TEXT    NOT NULL,
-        roleIndex     INTEGER NOT NULL DEFAULT 5,
-        avatarSeed    TEXT    NOT NULL,
-        createdAt     INTEGER NOT NULL
+        id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+        fullName           TEXT    NOT NULL,
+        email              TEXT    NOT NULL UNIQUE,
+        passwordHash       TEXT    NOT NULL,
+        roleIndex          INTEGER NOT NULL DEFAULT 5,
+        avatarSeed         TEXT    NOT NULL,
+        createdAt          INTEGER NOT NULL,
+        securityQuestion   INTEGER NOT NULL DEFAULT -1,
+        securityAnswerHash TEXT    NOT NULL DEFAULT ''
       )
     ''');
+    // Migration : si la table existe déjà sans les colonnes de la
+    // question secrète (v2 → v3), on les ajoute via ALTER TABLE.
+    await _addColumnIfMissing(db, 'users', 'securityQuestion',
+        'INTEGER NOT NULL DEFAULT -1');
+    await _addColumnIfMissing(db, 'users', 'securityAnswerHash',
+        "TEXT NOT NULL DEFAULT ''");
     // Index sur l'email : la connexion fait un lookup par email.
     await db.execute(
       'CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users (email)',
     );
+  }
+
+  static Future<void> _addColumnIfMissing(
+      Database db, String table, String column, String definition) async {
+    final cols = await db
+        .rawQuery('PRAGMA table_info($table)');
+    final exists = cols.any((c) => c['name'] == column);
+    if (!exists) {
+      await db.execute('ALTER TABLE $table ADD COLUMN $column $definition');
+    }
   }
 
   /// Comptes de démonstration (créés uniquement à la première
@@ -72,6 +99,10 @@ class UserDatabase {
         'roleIndex': row[3] as int,
         'avatarSeed': row[4] as String,
         'createdAt': DateTime.now().millisecondsSinceEpoch,
+        // Question secrète de démo : « Quel est le nom de votre équipe ? »
+        // Réponse : smartspace
+        'securityQuestion': 0,
+        'securityAnswerHash': hash('smartspace'),
       });
     }
     await batch.commit(noResult: true);

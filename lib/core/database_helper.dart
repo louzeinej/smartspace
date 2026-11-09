@@ -14,7 +14,7 @@ class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._();
 
   static const _nom = 'smartspace.db';
-  static const _version = 2; // v2 : ajout de la table users (module Utilisateurs)
+  static const _version = 3; // v3 : question secrète (réinitialisation mdp)
 
   Database? _db;
 

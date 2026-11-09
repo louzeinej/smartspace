@@ -13,6 +13,8 @@ class User {
     required this.role,
     required this.avatarSeed,
     required this.createdAt,
+    this.securityQuestion = -1,
+    this.securityAnswerHash = '',
   });
 
   final int? id;
@@ -23,6 +25,12 @@ class User {
   final String avatarSeed; // graine pour l'API DiceBear (valeur ajoutée)
   final DateTime createdAt;
 
+  /// Question secrète (index dans kSecurityQuestions, -1 = aucune) et
+  /// empreinte SHA-256 de la réponse — utilisées par « Mot de passe
+  /// oublié » (application offline : pas d'email possible).
+  final int securityQuestion;
+  final String securityAnswerHash;
+
   /// Sérialisation vers la base SQLite.
   Map<String, Object?> toMap() => {
         'id': id,
@@ -32,6 +40,8 @@ class User {
         'roleIndex': role.index,
         'avatarSeed': avatarSeed,
         'createdAt': createdAt.millisecondsSinceEpoch,
+        'securityQuestion': securityQuestion,
+        'securityAnswerHash': securityAnswerHash,
       };
 
   /// Désérialisation depuis une ligne SQLite.
@@ -44,6 +54,10 @@ class User {
         avatarSeed: map['avatarSeed'] as String,
         createdAt:
             DateTime.fromMillisecondsSinceEpoch(map['createdAt'] as int),
+        securityQuestion:
+            (map['securityQuestion'] as int?) ?? -1,
+        securityAnswerHash:
+            (map['securityAnswerHash'] as String?) ?? '',
       );
 
   /// Initiales affichées quand l'avatar distant n'est pas disponible

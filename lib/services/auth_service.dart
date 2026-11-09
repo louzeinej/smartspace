@@ -42,6 +42,8 @@ class AuthService {
     required String email,
     required String password,
     required UserRole role,
+    required int securityQuestion,
+    required String securityAnswer,
   }) async {
     final normalizedEmail = email.trim().toLowerCase();
 
@@ -68,6 +70,10 @@ class AuthService {
       role: effectiveRole,
       avatarSeed: AvatarService.randomSeed(),
       createdAt: DateTime.now(),
+      securityQuestion: securityQuestion,
+      // La réponse est normalisée (trim + minuscules) puis hachée,
+      // comme le mot de passe.
+      securityAnswerHash: _hash(securityAnswer.trim().toLowerCase()),
     );
 
     try {
@@ -80,6 +86,8 @@ class AuthService {
         role: user.role,
         avatarSeed: user.avatarSeed,
         createdAt: user.createdAt,
+        securityQuestion: user.securityQuestion,
+        securityAnswerHash: user.securityAnswerHash,
       ));
     } on DatabaseException catch (e) {
       // 2067 = SQLITE_CONSTRAINT (email dupliqué malgré le check)
@@ -146,9 +154,49 @@ class AuthService {
       role: user.role,
       avatarSeed: user.avatarSeed,
       createdAt: user.createdAt,
+      securityQuestion: user.securityQuestion,
+      securityAnswerHash: user.securityAnswerHash,
     );
     await _dao.update(updated);
     if (currentUser?.id == user.id) currentUser = updated;
+    return success(updated);
+  }
+
+  // ── MOT DE PASSE OUBLIÉ ───────────────────────────────────────────
+  /// Étape 1 : retrouver la question secrète d'un compte par email
+  /// (retourne null si le compte n'existe pas ou n'a pas de question).
+  Future<int?> getSecurityQuestionFor(String email) async {
+    final user = await _dao.findByEmail(email);
+    if (user == null || user.securityQuestion < 0) return null;
+    return user.securityQuestion;
+  }
+
+  /// Étape 2 : vérifier la réponse et définir un nouveau mot de passe.
+  Future<AuthResult> resetPassword({
+    required String email,
+    required String answer,
+    required String newPassword,
+  }) async {
+    final user = await _dao.findByEmail(email);
+    if (user == null || user.securityQuestion < 0) {
+      return failure('Aucune question secrète pour ce compte.');
+    }
+    if (user.securityAnswerHash !=
+        _hash(answer.trim().toLowerCase())) {
+      return failure('Réponse incorrecte.');
+    }
+    final updated = User(
+      id: user.id,
+      fullName: user.fullName,
+      email: user.email,
+      passwordHash: _hash(newPassword),
+      role: user.role,
+      avatarSeed: user.avatarSeed,
+      createdAt: user.createdAt,
+      securityQuestion: user.securityQuestion,
+      securityAnswerHash: user.securityAnswerHash,
+    );
+    await _dao.update(updated);
     return success(updated);
   }
 

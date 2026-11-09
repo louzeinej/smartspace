@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/gradient_button.dart';
+import 'forgot_password_screen.dart';
 import '../core/home_shell.dart';
 import 'register_screen.dart';
 
@@ -154,7 +155,19 @@ class _LoginScreenState extends State<LoginScreen> {
                         : null,
                     onFieldSubmitted: (_) => _submit(),
                   ),
-                  const SizedBox(height: 26),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                              builder: (_) =>
+                                  const ForgotPasswordScreen())),
+                      child: const Text('Mot de passe oublié ?',
+                          style: TextStyle(
+                              fontSize: 13, color: AppColors.primary)),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
                   GradientButton(
                     label: 'Se connecter',
                     icon: Icons.login_rounded,
