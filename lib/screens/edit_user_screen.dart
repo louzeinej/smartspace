@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../core/module_access.dart';
 import '../core/session.dart';
 import '../database/user_database.dart' show kSecurityQuestions;
 import '../database/user_dao.dart';
@@ -261,7 +262,8 @@ class _EditUserScreenState extends State<EditUserScreen> {
 
                 // ── RÔLE (création : libre ; édition : Administrateur seul) ──
                 if (widget.isCreate || !widget.editPassword)
-                  if (widget.isCreate || Session.estAdmin) ...[
+                  if (widget.isCreate ||
+                      ModuleAccess.canManageUsers(Session.roleEnum)) ...[
                     const Text('Rôle',
                         style: TextStyle(
                             fontSize: 14, fontWeight: FontWeight.w500)),

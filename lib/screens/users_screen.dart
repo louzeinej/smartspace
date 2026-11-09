@@ -9,6 +9,7 @@ import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/user_card.dart';
 import 'assistant_screen.dart';
+import 'roles_screen.dart';
 import 'edit_user_screen.dart';
 import 'login_screen.dart';
 import 'user_detail_screen.dart';
@@ -36,6 +37,14 @@ class _UsersScreenState extends State<UsersScreen> {
       appBar: AppBar(
         title: const Text('Utilisateurs'),
         actions: [
+          if (auth.canManageUsers)
+            IconButton(
+              tooltip: 'Gestion des rôles',
+              icon: const Icon(Icons.admin_panel_settings_outlined,
+                  color: AppColors.secondary),
+              onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const RolesScreen())),
+            ),
           IconButton(
             tooltip: 'Assistant SmartSpace',
             icon: const Icon(Icons.auto_awesome_rounded,
@@ -56,7 +65,7 @@ class _UsersScreenState extends State<UsersScreen> {
         ],
       ),
       // Création de comptes : privilège Administrateur uniquement.
-      floatingActionButton: auth.canDeleteAccounts
+      floatingActionButton: auth.canManageUsers
           ? FloatingActionButton.extended(
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,

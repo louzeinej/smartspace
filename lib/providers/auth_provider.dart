@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../core/module_access.dart';
 import '../core/session.dart';
 import '../models/user_model.dart';
 import '../models/user_role.dart';
@@ -17,10 +18,16 @@ class AuthProvider extends ChangeNotifier {
   User? get currentUser => _auth.currentUser;
   bool get isLoggedIn => currentUser != null;
 
-  /// Vrai si l'utilisateur connecté peut supprimer des comptes
-  /// (règle d'accès métier : Administrateur uniquement).
-  bool get canDeleteAccounts =>
-      currentUser?.role == UserRole.administrateur;
+  /// Droits de l'utilisateur connecté — délégués à ModuleAccess
+  /// (source unique de vérité, partagée avec les autres modules).
+  bool get canManageUsers =>
+      ModuleAccess.canManageUsers(currentUser?.role ?? UserRole.employe);
+
+  bool get canCreateProject =>
+      ModuleAccess.canCreateProject(currentUser?.role ?? UserRole.employe);
+
+  bool get canManageRooms =>
+      ModuleAccess.canManageRooms(currentUser?.role ?? UserRole.employe);
 
   Future<void> restoreSession() async {
     await _auth.restoreSession();
@@ -36,6 +43,7 @@ class AuthProvider extends ChangeNotifier {
         id: res.user!.id!,
         nom: res.user!.fullName,
         role: res.user!.role.label,
+        roleIndex: res.user!.role.index,
       );
       notifyListeners();
     }

@@ -29,7 +29,12 @@ class _SplashScreenState extends State<SplashScreen> {
     if (auth.isLoggedIn) {
       // Restaure aussi la Session partagée (redémarrage de l'app).
       final u = auth.currentUser!;
-      Session.connecter(id: u.id!, nom: u.fullName, role: u.role.label);
+      Session.connecter(
+        id: u.id!,
+        nom: u.fullName,
+        role: u.role.label,
+        roleIndex: u.role.index,
+      );
     }
     if (!mounted) return;
     Navigator.of(context).pushReplacement(MaterialPageRoute(

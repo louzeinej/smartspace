@@ -44,7 +44,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final me = auth.currentUser;
-    final isAdmin = auth.canDeleteAccounts;
+    final isAdmin = auth.canManageUsers;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Profil utilisateur')),

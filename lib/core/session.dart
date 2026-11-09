@@ -1,20 +1,33 @@
+import '../models/user_role.dart';
+
 /// Utilisateur connecté, partagé par tous les modules.
 ///
-/// Provisoire : sera rempli par le module Utilisateurs (Youssef Messoudi)
-/// après la connexion. En attendant, un administrateur de démo est connecté.
+/// Rempli par le module Utilisateurs (Youssef Messoudi) après la
+/// connexion. Les modules lisent [roleEnum] et interrogent
+/// [ModuleAccess] (core/module_access.dart) pour leurs droits.
 class Session {
   Session._();
 
-  static int utilisateurId = 1;
-  static String nom = 'Admin démo';
-  static String role = 'Administrateur';
+  static int utilisateurId = 0;
+  static String nom = '';
+  static String role = '';
+  static int roleIndex = UserRole.employe.index;
 
-  static bool get estAdmin => role == 'Administrateur';
+  /// Rôle typé, pour interroger ModuleAccess.
+  static UserRole get roleEnum => UserRole.fromIndex(roleIndex);
 
-  static void connecter({required int id, required String nom, required String role}) {
+  static bool get estAdmin => roleEnum == UserRole.administrateur;
+
+  static void connecter({
+    required int id,
+    required String nom,
+    required String role,
+    int? roleIndex,
+  }) {
     utilisateurId = id;
     Session.nom = nom;
     Session.role = role;
+    Session.roleIndex = roleIndex ?? UserRole.employe.index;
   }
 
   /// Appelée par le module Utilisateurs à la déconnexion.
@@ -22,5 +35,6 @@ class Session {
     utilisateurId = 0;
     nom = '';
     role = '';
+    roleIndex = UserRole.employe.index;
   }
 }
