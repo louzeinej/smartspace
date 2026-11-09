@@ -7,6 +7,7 @@ import 'package:smartspace/projets/data/projet_database.dart';
 import 'package:smartspace/projets/models/projet.dart';
 import 'package:smartspace/projets/models/statut_tache.dart';
 import 'package:smartspace/projets/models/tache.dart';
+import 'package:smartspace/projets/projets_module.dart';
 import 'package:smartspace/projets/screens/mes_taches_screen.dart';
 import 'package:smartspace/projets/screens/projet_detail_screen.dart';
 import 'package:smartspace/projets/screens/projets_screen.dart';
@@ -435,6 +436,60 @@ void main() {
       expect(apres.utilisateurId, isNull);
       expect(find.text('Finie'), findsNothing);
       expect(find.text('Bloquante'), findsOneWidget);
+    });
+  });
+
+  group('Module à deux onglets', () {
+    testWidgets('Mes tâches ouvert se recharge après une affectation',
+        (t) async {
+      final p = await t.runAsync(() => ajouterProjet(designer.id));
+      final tacheId = await t.runAsync(() => ajouterTache(p!, titre: 'Logo'));
+      acteurCourant = commeActeur(designer);
+      await afficher(t, ProjetsModule(service: service));
+
+      await taper(t, find.text('Mes tâches'));
+      expect(find.text('Aucune tâche ne vous est affectée.'), findsOneWidget);
+
+      // Écriture faite ailleurs pendant que l'onglet reste affiché.
+      await t.runAsync(() async {
+        final rows =
+            await db.query('taches', where: 'id = ?', whereArgs: [tacheId]);
+        await service.affecterA(Tache.fromMap(rows.first), designer);
+      });
+      await stabiliser(t);
+
+      expect(find.text('Logo'), findsOneWidget);
+      expect(find.text('Aucune tâche ne vous est affectée.'), findsNothing);
+    });
+
+    testWidgets('parcours complet : affecter puis changer le statut', (t) async {
+      final p = await t.runAsync(() => ajouterProjet(designer.id));
+      final tacheId = await t.runAsync(() => ajouterTache(p!, titre: 'Logo'));
+      acteurCourant = commeActeur(designer);
+      await afficher(t, ProjetsModule(service: service));
+
+      await taper(t, find.text('Refonte'));
+      await taper(t, find.text('Affecter'));
+      await taper(t, find.widgetWithText(TextButton, 'Affecter').first);
+      expect(find.text('Affectée à Alice Design'), findsOneWidget);
+
+      await t.pageBack();
+      await stabiliser(t);
+      await taper(t, find.text('Mes tâches'));
+      await taper(t, find.byType(DropdownButton<StatutTache>));
+      await taper(t, find.text('Terminée').last);
+
+      expect((await lireTache(t, tacheId!)).statut, StatutTache.terminee);
+    });
+
+    testWidgets('le titre de l\'en-tête est blanc malgré le thème global',
+        (t) async {
+      await afficher(t, ProjetsModule(service: service));
+      final texte = t.widget<RichText>(find
+          .descendant(
+              of: find.byType(AppBar), matching: find.byType(RichText))
+          .first);
+      expect(texte.text.style!.color, Colors.white);
     });
   });
 
