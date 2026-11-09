@@ -45,6 +45,7 @@ class AuthService {
     required UserRole role,
     required int securityQuestion,
     required String securityAnswer,
+    bool allowAdminRole = false,
   }) async {
     final normalizedEmail = email.trim().toLowerCase();
 
@@ -61,8 +62,14 @@ class AuthService {
     // une promotion par un Administrateur existant est possible
     // (voir EditUserScreen).
     final userCount = await _dao.countAll();
-    final effectiveRole =
-        userCount == 0 ? UserRole.administrateur : role;
+    // Le rôle Administrateur n'est autorisé que pour le premier compte
+    // ou lorsqu'un Administrateur existant crée le compte (allowAdminRole).
+    UserRole effectiveRole = role;
+    if (userCount == 0) {
+      effectiveRole = UserRole.administrateur;
+    } else if (role == UserRole.administrateur && !allowAdminRole) {
+      effectiveRole = UserRole.employe; // anti-escalade de privilèges
+    }
 
     final user = User(
       fullName: fullName.trim(),

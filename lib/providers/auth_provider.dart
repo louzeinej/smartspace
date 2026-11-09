@@ -42,6 +42,8 @@ class AuthProvider extends ChangeNotifier {
     return res;
   }
 
+  /// Inscription publique : le rôle Administrateur est refusé
+  /// (garde anti-escalade côté service).
   Future<AuthResult> register({
     required String fullName,
     required String email,
@@ -49,7 +51,7 @@ class AuthProvider extends ChangeNotifier {
     required UserRole role,
     required int securityQuestion,
     required String securityAnswer,
-  }) async {
+  }) {
     return _auth.register(
       fullName: fullName,
       email: email,
@@ -57,6 +59,27 @@ class AuthProvider extends ChangeNotifier {
       role: role,
       securityQuestion: securityQuestion,
       securityAnswer: securityAnswer,
+    );
+  }
+
+  /// Création d'un compte PAR UN ADMINISTRATEUR (écran annuaire) :
+  /// l'admin peut attribuer n'importe quel rôle, y compris Administrateur.
+  Future<AuthResult> adminCreateUser({
+    required String fullName,
+    required String email,
+    required String password,
+    required UserRole role,
+    required int securityQuestion,
+    required String securityAnswer,
+  }) {
+    return _auth.register(
+      fullName: fullName,
+      email: email,
+      password: password,
+      role: role,
+      securityQuestion: securityQuestion,
+      securityAnswer: securityAnswer,
+      allowAdminRole: Session.estAdmin,
     );
   }
 

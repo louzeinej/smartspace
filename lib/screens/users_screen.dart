@@ -9,6 +9,7 @@ import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/user_card.dart';
 import 'assistant_screen.dart';
+import 'edit_user_screen.dart';
 import 'login_screen.dart';
 import 'user_detail_screen.dart';
 
@@ -54,6 +55,22 @@ class _UsersScreenState extends State<UsersScreen> {
           ),
         ],
       ),
+      // Création de comptes : privilège Administrateur uniquement.
+      floatingActionButton: auth.canDeleteAccounts
+          ? FloatingActionButton.extended(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              icon: const Icon(Icons.person_add_rounded),
+              label: const Text('Ajouter',
+                  style: TextStyle(fontSize: 13)),
+              onPressed: () async {
+                final created = await Navigator.of(context).push(
+                    MaterialPageRoute(
+                        builder: (_) => const EditUserScreen()));
+                if (created == true) setState(() {});
+              },
+            )
+          : null,
       body: Column(
         children: [
           // ── Bandeau profil connecté ──
