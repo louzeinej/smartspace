@@ -38,6 +38,13 @@ dependencies:
   path: ^1.9.1
   sqflite_common_ffi: ^2.4.5
 
+  # Module Utilisateurs (Youssef Messoudi)
+  crypto: ^3.0.3             # hash SHA-256 des mots de passe
+  http: ^1.2.0               # web service DiceBear (avatars)
+  provider: ^6.1.2           # état de session
+  shared_preferences: ^2.2.3 # persistance de la session
+  intl: ^0.19.0              # formatage des dates
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

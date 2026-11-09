@@ -2,10 +2,12 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
-import 'core/home_shell.dart';
-import 'reservations/ui/smartspace_style.dart';
+import 'providers/auth_provider.dart';
+import 'screens/splash_screen.dart';
+import 'theme/app_theme.dart';
 
 void main() {
   // sqflite fonctionne nativement sur Android/iOS. Sur PC (Windows/Linux),
@@ -22,15 +24,16 @@ class SmartSpaceApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'SmartSpace',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: SsColors.primaire),
-        scaffoldBackgroundColor: SsColors.fond,
-        useMaterial3: true,
+    // AuthProvider : état de session du module Utilisateurs, partagé
+    // avec toute l'application (Session + HomeShell).
+    return ChangeNotifierProvider(
+      create: (_) => AuthProvider(),
+      child: MaterialApp(
+        title: 'SmartSpace',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.light,
+        home: const SplashScreen(),
       ),
-      home: const HomeShell(),
     );
   }
 }

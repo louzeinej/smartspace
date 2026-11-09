@@ -16,4 +16,11 @@ class Session {
     Session.nom = nom;
     Session.role = role;
   }
+
+  /// Appelée par le module Utilisateurs à la déconnexion.
+  static void deconnecter() {
+    utilisateurId = 0;
+    nom = '';
+    role = '';
+  }
 }

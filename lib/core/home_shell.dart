@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../reservations/reservations_module.dart';
+import '../screens/users_screen.dart';
 import '../reservations/ui/smartspace_style.dart';
 import 'session.dart';
 
@@ -14,12 +15,12 @@ class HomeShell extends StatefulWidget {
 }
 
 class _HomeShellState extends State<HomeShell> {
-  int _index = 2; // ouvre sur Réservations le temps du développement
+  int _index = 0; // ouvre sur l'annuaire Utilisateurs
 
   @override
   Widget build(BuildContext context) {
     final modules = <Widget>[
-      const _ModuleAVenir(nom: 'Gestion des Utilisateurs', responsable: 'Youssef Messoudi'),
+      const UsersScreen(), // Module Utilisateurs (Youssef Messoudi)
       const _ModuleAVenir(nom: 'Projets et Tâches', responsable: 'Youssef Sghaier'),
       ReservationsModule(
         utilisateurId: Session.utilisateurId,
