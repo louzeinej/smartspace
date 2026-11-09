@@ -27,12 +27,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
   UserRole _selectedRole = UserRole.employe;
   int _securityQuestion = 0;
   final _answerCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
   bool _obscure = true;
   bool _loading = false;
   String? _error;
 
   @override
   void dispose() {
+    _phoneCtrl.dispose();
     _answerCtrl.dispose();
     _nameCtrl.dispose();
     _emailCtrl.dispose();
@@ -54,6 +56,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           role: _selectedRole,
           securityQuestion: _securityQuestion,
           securityAnswer: _answerCtrl.text,
+          phone: _phoneCtrl.text,
         );
     if (!mounted) return;
     setState(() => _loading = false);
@@ -164,6 +167,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ? 'Les mots de passe ne correspondent pas.'
                       : null,
                 ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: _phoneCtrl,
+                  keyboardType: TextInputType.phone,
+                  decoration: const InputDecoration(
+                    hintText: 'Téléphone (optionnel — pour le reset du mot de passe)',
+                    prefixIcon: Icon(Icons.phone_outlined),
+                  ),
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) return null;
+                    final digits = v.replaceAll(RegExp(r'\D'), '');
+                    return digits.length < 8
+                        ? 'Au moins 8 chiffres (ou laisser vide).'
+                        : null;
+                  },
+                ),
+
                 // ── Question secrète (réinitialisation du mot de passe) ──
                 const SizedBox(height: 22),
                 const Text('Question secrète',

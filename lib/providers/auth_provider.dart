@@ -51,6 +51,7 @@ class AuthProvider extends ChangeNotifier {
     required UserRole role,
     required int securityQuestion,
     required String securityAnswer,
+    String phone = '',
   }) {
     return _auth.register(
       fullName: fullName,
@@ -59,6 +60,7 @@ class AuthProvider extends ChangeNotifier {
       role: role,
       securityQuestion: securityQuestion,
       securityAnswer: securityAnswer,
+      phone: phone,
     );
   }
 
@@ -71,6 +73,7 @@ class AuthProvider extends ChangeNotifier {
     required UserRole role,
     required int securityQuestion,
     required String securityAnswer,
+    String phone = '',
   }) {
     return _auth.register(
       fullName: fullName,
@@ -80,32 +83,33 @@ class AuthProvider extends ChangeNotifier {
       securityQuestion: securityQuestion,
       securityAnswer: securityAnswer,
       allowAdminRole: Session.estAdmin,
+      phone: phone,
     );
   }
 
   /// « Mot de passe oublié » : question secrète du compte, puis reset.
-  Future<int?> securityQuestionFor(String email) =>
-      _auth.getSecurityQuestionFor(email);
+  Future<int?> securityQuestionFor(String identifier) =>
+      _auth.getSecurityQuestionFor(identifier);
 
   /// Mot de passe oublié — méthode « code de vérification » (API).
-  Future<AuthResult> requestResetCode(String email) =>
-      _auth.requestResetCode(email);
+  Future<AuthResult> requestResetCode(String identifier) =>
+      _auth.requestResetCode(identifier);
 
   Future<AuthResult> resetPasswordWithCode({
-    required String email,
+    required String identifier,
     required String code,
     required String newPassword,
   }) =>
       _auth.resetPasswordWithCode(
-          email: email, code: code, newPassword: newPassword);
+          identifier: identifier, code: code, newPassword: newPassword);
 
   Future<AuthResult> resetPassword({
-    required String email,
+    required String identifier,
     required String answer,
     required String newPassword,
   }) =>
       _auth.resetPassword(
-          email: email, answer: answer, newPassword: newPassword);
+          identifier: identifier, answer: answer, newPassword: newPassword);
 
   Future<AuthResult> changePassword(
       User user, String oldPassword, String newPassword) {

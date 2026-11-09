@@ -46,6 +46,7 @@ class AuthService {
     required int securityQuestion,
     required String securityAnswer,
     bool allowAdminRole = false,
+    String phone = '',
   }) async {
     final normalizedEmail = email.trim().toLowerCase();
 
@@ -82,6 +83,7 @@ class AuthService {
       // La réponse est normalisée (trim + minuscules) puis hachée,
       // comme le mot de passe.
       securityAnswerHash: _hash(securityAnswer.trim().toLowerCase()),
+      phone: phone.trim(),
     );
 
     try {
@@ -177,15 +179,24 @@ class AuthService {
       _pendingCodes = {};
   static const _codeValidity = Duration(minutes: 10);
 
-  /// Demande un code de vérification pour un email.
+  /// Résout un identifiant de connexion/reset : email OU numéro de
+  /// téléphone. Contient un « @ » → email, sinon → téléphone.
+  Future<User?> _findByIdentifier(String identifier) {
+    final id = identifier.trim();
+    return id.contains('@')
+        ? _dao.findByEmail(id)
+        : _dao.findByPhone(id);
+  }
+
+  /// Demande un code de vérification pour un email OU un téléphone.
   /// Le code est généré par le web service random.org (valeur ajoutée),
   /// avec fallback local hors-ligne. Dans une vraie entreprise, il
-  /// serait envoyé par email ; en démo, il est renvoyé à l'UI qui
-  /// l'affiche dans une boîte de dialogue « simulation email ».
-  Future<AuthResult> requestResetCode(String email) async {
-    final user = await _dao.findByEmail(email);
+  /// serait envoyé par email/SMS ; en démo, il est renvoyé à l'UI qui
+  /// l'affiche dans une boîte de dialogue « simulation email/SMS ».
+  Future<AuthResult> requestResetCode(String identifier) async {
+    final user = await _findByIdentifier(identifier);
     if (user == null) {
-      return failure('Aucun compte pour cet email.');
+      return failure('Aucun compte pour cet email ou ce numéro.');
     }
     final generated = await VerificationCodeService.generate();
     _pendingCodes[user.email] = (
@@ -201,12 +212,15 @@ class AuthService {
     );
   }
 
-  /// Vérifie le code saisi pour un email donné.
-  bool checkResetCode(String email, String code) {
-    final pending = _pendingCodes[email.trim().toLowerCase()];
+  /// Vérifie le code saisi pour un identifiant (email ou téléphone)
+  /// donné. Les codes sont stockés sous l'email du compte.
+  Future<bool> checkResetCode(String identifier, String code) async {
+    final user = await _findByIdentifier(identifier);
+    if (user == null) return false;
+    final pending = _pendingCodes[user.email];
     if (pending == null) return false;
     if (DateTime.now().isAfter(pending.expires)) {
-      _pendingCodes.remove(email.trim().toLowerCase());
+      _pendingCodes.remove(user.email);
       return false;
     }
     return pending.code == code.trim();
@@ -214,15 +228,17 @@ class AuthService {
 
   /// Réinitialisation par code vérifié : définit le nouveau mot de passe.
   Future<AuthResult> resetPasswordWithCode({
-    required String email,
+    required String identifier,
     required String code,
     required String newPassword,
   }) async {
-    if (!checkResetCode(email, code)) {
+    final user = await _findByIdentifier(identifier);
+    if (user == null) {
+      return failure('Aucun compte pour cet email ou ce numéro.');
+    }
+    if (!await checkResetCode(identifier, code)) {
       return failure('Code invalide ou expiré (validité 10 minutes).');
     }
-    final user = await _dao.findByEmail(email);
-    if (user == null) return failure('Aucun compte pour cet email.');
     final updated = User(
       id: user.id,
       fullName: user.fullName,
@@ -233,6 +249,7 @@ class AuthService {
       createdAt: user.createdAt,
       securityQuestion: user.securityQuestion,
       securityAnswerHash: user.securityAnswerHash,
+      phone: user.phone,
     );
     await _dao.update(updated);
     _pendingCodes.remove(user.email);
@@ -241,19 +258,19 @@ class AuthService {
 
   /// Étape 1 : retrouver la question secrète d'un compte par email
   /// (retourne null si le compte n'existe pas ou n'a pas de question).
-  Future<int?> getSecurityQuestionFor(String email) async {
-    final user = await _dao.findByEmail(email);
+  Future<int?> getSecurityQuestionFor(String identifier) async {
+    final user = await _findByIdentifier(identifier);
     if (user == null || user.securityQuestion < 0) return null;
     return user.securityQuestion;
   }
 
   /// Étape 2 : vérifier la réponse et définir un nouveau mot de passe.
   Future<AuthResult> resetPassword({
-    required String email,
+    required String identifier,
     required String answer,
     required String newPassword,
   }) async {
-    final user = await _dao.findByEmail(email);
+    final user = await _findByIdentifier(identifier);
     if (user == null || user.securityQuestion < 0) {
       return failure('Aucune question secrète pour ce compte.');
     }
@@ -271,6 +288,7 @@ class AuthService {
       createdAt: user.createdAt,
       securityQuestion: user.securityQuestion,
       securityAnswerHash: user.securityAnswerHash,
+      phone: user.phone,
     );
     await _dao.update(updated);
     return success(updated);

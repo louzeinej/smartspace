@@ -33,7 +33,8 @@ class UserDatabase {
         avatarSeed         TEXT    NOT NULL,
         createdAt          INTEGER NOT NULL,
         securityQuestion   INTEGER NOT NULL DEFAULT -1,
-        securityAnswerHash TEXT    NOT NULL DEFAULT ''
+        securityAnswerHash TEXT    NOT NULL DEFAULT '',
+        phone              TEXT    NOT NULL DEFAULT ''
       )
     ''');
     // Migration : si la table existe déjà sans les colonnes de la
@@ -41,6 +42,8 @@ class UserDatabase {
     await _addColumnIfMissing(db, 'users', 'securityQuestion',
         'INTEGER NOT NULL DEFAULT -1');
     await _addColumnIfMissing(db, 'users', 'securityAnswerHash',
+        "TEXT NOT NULL DEFAULT ''");
+    await _addColumnIfMissing(db, 'users', 'phone',
         "TEXT NOT NULL DEFAULT ''");
     // Index sur l'email : la connexion fait un lookup par email.
     await db.execute(
@@ -73,17 +76,17 @@ class UserDatabase {
         sha256.convert(pwd.codeUnits).toString();
 
     final demo = [
-      // [nom, email, mot de passe, rôle, graine avatar]
+      // [nom, email, mot de passe, rôle, graine avatar, téléphone]
       ['Youssef Messoudi', 'dev@smartspace.tn', 'Dev12345',
-          UserRole.developpeur.index, 'youssef-dev'],
+          UserRole.developpeur.index, 'youssef-dev', '20111223'],
       ['Youssef Sghaier', 'scrum@smartspace.tn', 'Scrum123',
-          UserRole.scrumMaster.index, 'youssef-scrum'],
+          UserRole.scrumMaster.index, 'youssef-scrum', '20333445'],
       ['Youssef Fadaoui', 'admin@smartspace.tn', 'Admin123',
-          UserRole.administrateur.index, 'youssef-admin'],
+          UserRole.administrateur.index, 'youssef-admin', '20555667'],
       ['Manar Kalai', 'uiux@smartspace.tn', 'Uiux1234',
-          UserRole.uiuxDesigner.index, 'manar-uiux'],
+          UserRole.uiuxDesigner.index, 'manar-uiux', '98776655'],
       ['Louzeine Aloui', 'louzeine@smartspace.tn', 'Louz1234',
-          UserRole.rh.index, 'louzeine-rh'],
+          UserRole.rh.index, 'louzeine-rh', '94445533'],
     ];
 
     final count =
@@ -103,6 +106,7 @@ class UserDatabase {
         // Réponse : smartspace
         'securityQuestion': 0,
         'securityAnswerHash': hash('smartspace'),
+        'phone': row[5] as String,
       });
     }
     await batch.commit(noResult: true);

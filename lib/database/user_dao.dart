@@ -57,6 +57,19 @@ class UserDao {
     return rows.isEmpty ? null : User.fromMap(rows.first);
   }
 
+  /// Recherche par numéro de téléphone (réinitialisation du mot de
+  /// passe). La comparaison porte sur les chiffres uniquement, donc
+  /// « 20 111 223 » et « 20111223 » correspondent.
+  Future<User?> findByPhone(String phone) async {
+    final digits = phone.replaceAll(RegExp(r'\D'), '');
+    if (digits.length < 6) return null;
+    final all = await getAll();
+    for (final u in all) {
+      if (u.phone.replaceAll(RegExp(r'\D'), '') == digits) return u;
+    }
+    return null;
+  }
+
   /// Recherche par id (page de détail après navigation).
   Future<User?> findById(int id) async {
     final db = await _db;

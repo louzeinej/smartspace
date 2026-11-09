@@ -15,6 +15,7 @@ class User {
     required this.createdAt,
     this.securityQuestion = -1,
     this.securityAnswerHash = '',
+    this.phone = '',
   });
 
   final int? id;
@@ -31,6 +32,10 @@ class User {
   final int securityQuestion;
   final String securityAnswerHash;
 
+  /// Numéro de téléphone (optionnel) — canal alternatif pour la
+  /// réinitialisation du mot de passe.
+  final String phone;
+
   /// Sérialisation vers la base SQLite.
   Map<String, Object?> toMap() => {
         'id': id,
@@ -42,6 +47,7 @@ class User {
         'createdAt': createdAt.millisecondsSinceEpoch,
         'securityQuestion': securityQuestion,
         'securityAnswerHash': securityAnswerHash,
+        'phone': phone,
       };
 
   /// Désérialisation depuis une ligne SQLite.
@@ -58,6 +64,7 @@ class User {
             (map['securityQuestion'] as int?) ?? -1,
         securityAnswerHash:
             (map['securityAnswerHash'] as String?) ?? '',
+        phone: (map['phone'] as String?) ?? '',
       );
 
   /// Initiales affichées quand l'avatar distant n'est pas disponible

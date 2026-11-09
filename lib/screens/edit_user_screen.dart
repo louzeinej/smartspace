@@ -41,6 +41,7 @@ class _EditUserScreenState extends State<EditUserScreen> {
   final _newPwdCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
   final _answerCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
   late UserRole _role = widget.user?.role ?? UserRole.employe;
   int _securityQuestion = 0;
   final _obscure = true;
@@ -55,6 +56,7 @@ class _EditUserScreenState extends State<EditUserScreen> {
     _newPwdCtrl.dispose();
     _confirmCtrl.dispose();
     _answerCtrl.dispose();
+    _phoneCtrl.dispose();
     super.dispose();
   }
 
@@ -74,6 +76,7 @@ class _EditUserScreenState extends State<EditUserScreen> {
             role: _role,
             securityQuestion: _securityQuestion,
             securityAnswer: _answerCtrl.text,
+            phone: _phoneCtrl.text,
           );
       if (!mounted) return;
       setState(() => _loading = false);
@@ -302,6 +305,22 @@ class _EditUserScreenState extends State<EditUserScreen> {
 
                 // ── QUESTION SECRÈTE (création uniquement) ──
                 if (widget.isCreate) ...[
+                  const SizedBox(height: 14),
+                  TextFormField(
+                    controller: _phoneCtrl,
+                    keyboardType: TextInputType.phone,
+                    decoration: const InputDecoration(
+                      hintText: 'Téléphone (optionnel)',
+                      prefixIcon: Icon(Icons.phone_outlined),
+                    ),
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) return null;
+                      final digits = v.replaceAll(RegExp(r'\D'), '');
+                      return digits.length < 8
+                          ? 'Au moins 8 chiffres (ou laisser vide).'
+                          : null;
+                    },
+                  ),
                   const SizedBox(height: 18),
                   DropdownButtonFormField<int>(
                     initialValue: _securityQuestion,

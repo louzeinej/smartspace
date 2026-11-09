@@ -114,12 +114,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     final auth = context.read<AuthProvider>();
     final res = _method == _Method.codeApi
         ? await auth.resetPasswordWithCode(
-            email: _emailCtrl.text,
+            identifier: _emailCtrl.text,
             code: _codeCtrl.text,
             newPassword: _newPwdCtrl.text,
           )
         : await auth.resetPassword(
-            email: _emailCtrl.text,
+            identifier: _emailCtrl.text,
             answer: _answerCtrl.text,
             newPassword: _newPwdCtrl.text,
           );
@@ -184,8 +184,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           enabled: !_codeSent && _questionIndex == null,
           keyboardType: TextInputType.emailAddress,
           decoration: const InputDecoration(
-            hintText: 'Email du compte',
-            prefixIcon: Icon(Icons.mail_outline_rounded),
+            hintText: 'Email ou numéro de téléphone',
+            prefixIcon: Icon(Icons.alternate_email_rounded),
           ),
         ),
         if (!_codeSent && _questionIndex == null) ...[
@@ -217,7 +217,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'Code envoyé (généré par l\'API random.org). '
+                  'Code envoyé par email/SMS (généré par l\'API random.org). '
                   'Saisissez-le ci-dessous — valable 10 minutes.',
                   style: TextStyle(fontSize: 12.5, color: AppColors.secondary),
                 ),
