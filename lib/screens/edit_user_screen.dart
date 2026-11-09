@@ -43,6 +43,8 @@ class _EditUserScreenState extends State<EditUserScreen> {
   final _confirmCtrl = TextEditingController();
   final _answerCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
+  late final TextEditingController _editPhoneCtrl =
+      TextEditingController(text: widget.user?.phone ?? '');
   late UserRole _role = widget.user?.role ?? UserRole.employe;
   int _securityQuestion = 0;
   final _obscure = true;
@@ -58,6 +60,7 @@ class _EditUserScreenState extends State<EditUserScreen> {
     _confirmCtrl.dispose();
     _answerCtrl.dispose();
     _phoneCtrl.dispose();
+    _editPhoneCtrl.dispose();
     super.dispose();
   }
 
@@ -138,6 +141,7 @@ class _EditUserScreenState extends State<EditUserScreen> {
       createdAt: widget.user!.createdAt,
       securityQuestion: widget.user!.securityQuestion,
       securityAnswerHash: widget.user!.securityAnswerHash,
+      phone: _editPhoneCtrl.text.trim(),
     );
     await UserDao.instance.update(updated);
     if (!mounted) return;
@@ -255,6 +259,22 @@ class _EditUserScreenState extends State<EditUserScreen> {
                         return 'Format d\'email invalide.';
                       }
                       return null;
+                    },
+                  ),
+                  const SizedBox(height: 14),
+                  TextFormField(
+                    controller: _editPhoneCtrl,
+                    keyboardType: TextInputType.phone,
+                    decoration: const InputDecoration(
+                      hintText: 'Téléphone (optionnel)',
+                      prefixIcon: Icon(Icons.phone_outlined),
+                    ),
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) return null;
+                      final digits = v.replaceAll(RegExp(r'\D'), '');
+                      return digits.length < 8
+                          ? 'Au moins 8 chiffres (ou laisser vide).'
+                          : null;
                     },
                   ),
                   const SizedBox(height: 20),

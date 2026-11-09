@@ -103,6 +103,8 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
 
                 // ── Informations ──
                 _infoTile(Icons.mail_outline_rounded, 'Email', user.email),
+                _infoTile(Icons.phone_outlined, 'Téléphone',
+                    user.phone.isEmpty ? 'Non renseigné' : user.phone),
                 _infoTile(Icons.badge_outlined, 'Rôle', user.role.label),
                 _infoTile(Icons.calendar_today_outlined, 'Membre depuis',
                     formatDate(user.createdAt)),
