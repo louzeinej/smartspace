@@ -1,5 +1,9 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:smartspace/database/user_database.dart';
 import 'package:smartspace/models/user_model.dart';
 import 'package:smartspace/models/user_role.dart';
@@ -13,6 +17,8 @@ import 'package:smartspace/projets/screens/projet_detail_screen.dart';
 import 'package:smartspace/projets/screens/projets_screen.dart';
 import 'package:smartspace/projets/services/projet_access.dart';
 import 'package:smartspace/projets/services/projet_service.dart';
+import 'package:smartspace/projets/services/suggestion_service.dart';
+import 'package:smartspace/reservations/ui/smartspace_style.dart';
 import 'package:smartspace/theme/app_theme.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -498,6 +504,210 @@ void main() {
               of: find.byType(AppBar), matching: find.byType(RichText))
           .first);
       expect(texte.text.style!.color, Colors.white);
+    });
+  });
+
+  group('Suggestions IA', () {
+    late int appelsIa;
+
+    String reponseGemini(List<Map<String, Object?>> taches) => jsonEncode({
+          'candidates': [
+            {
+              'content': {
+                'parts': [
+                  {'text': jsonEncode(taches)}
+                ]
+              }
+            }
+          ]
+        });
+
+    Map<String, Object?> suggestion(String titre, int duree,
+            {String role = 'UI/UX Designer'}) =>
+        {
+          'titre': titre,
+          'description': 'Description de $titre',
+          'dureeJours': duree,
+          'role': role,
+        };
+
+    SuggestionService ia(http.Response Function(int appel) reponse,
+        {String cle = 'cle-de-test'}) {
+      appelsIa = 0;
+      return SuggestionService(
+        cleApi: cle,
+        client: MockClient((_) async => reponse(++appelsIa)),
+      );
+    }
+
+    final troisSuggestions = [
+      suggestion('Charte graphique', 2),
+      suggestion('API', 3, role: 'Développeur'),
+      suggestion('Recette', 1, role: 'Scrum Master'),
+    ];
+
+    Future<int> ouvrirDetail(WidgetTester t, SuggestionService s) async {
+      final p = await t.runAsync(() => ajouterProjet(createur.id));
+      await afficher(
+          t,
+          ProjetDetailScreen(
+              service: service, projet: await projetDe(t, p!), suggestions: s));
+      return p;
+    }
+
+    String jour(int decalage) {
+      final d = DateTime.now();
+      return formatDate(DateTime(d.year, d.month, d.day + decalage));
+    }
+
+    testWidgets('bouton visible pour le créateur, caché pour les autres',
+        (t) async {
+      final s = ia((_) => http.Response('', 500));
+      await ouvrirDetail(t, s);
+      expect(find.text('Suggérer des tâches'), findsOneWidget);
+
+      acteurCourant = commeActeur(autreScrum);
+      await afficher(
+          t,
+          ProjetDetailScreen(
+              service: service,
+              projet: (await t.runAsync(() => service.getProjets()))!.single,
+              suggestions: s));
+      expect(find.text('Suggérer des tâches'), findsNothing);
+    });
+
+    testWidgets('sans clé : message clair, aucun appel, aucun écran',
+        (t) async {
+      final s = ia((_) => http.Response(reponseGemini(troisSuggestions), 200),
+          cle: '');
+      await ouvrirDetail(t, s);
+
+      await taper(t, find.text('Suggérer des tâches'));
+
+      expect(find.textContaining('aucune clé API Gemini'), findsOneWidget);
+      expect(find.text('Suggestions IA'), findsNothing);
+      expect(appelsIa, 0);
+    });
+
+    testWidgets('relire, décocher, modifier puis créer : seules les cochées',
+        (t) async {
+      final p = await ouvrirDetail(
+          t, ia((_) => http.Response(reponseGemini(troisSuggestions), 200)));
+
+      await taper(t, find.text('Suggérer des tâches'));
+      expect(find.text('Suggestions IA'), findsOneWidget);
+      expect(find.text('Créer 3 tâche(s)'), findsOneWidget);
+      // Rien n'est créé avant validation.
+      expect(await t.runAsync(() => service.getTachesProjet(p)), isEmpty);
+
+      // Décocher avant de saisir : un champ actif fait défiler la liste
+      // pour garder son curseur visible, ce qui fausserait le tap.
+      // Cible la carte par son contenu : un index changerait au défilement.
+      final carteApi = find.ancestor(
+          of: find.widgetWithText(TextFormField, 'API'),
+          matching: find.byType(SsCarte));
+      await taper(
+          t, find.descendant(of: carteApi, matching: find.byType(Checkbox)));
+      expect(find.text('Créer 2 tâche(s)'), findsOneWidget);
+      await t.drag(find.byType(ListView).first, const Offset(0, 2000));
+      await stabiliser(t);
+      await t.enterText(
+          find.widgetWithText(TextFormField, 'Charte graphique'), 'Charte v2');
+
+      await taper(t, find.text('Créer 2 tâche(s)'));
+
+      expect(find.text('Suggestions IA'), findsNothing);
+      expect(find.text('Charte v2'), findsOneWidget);
+
+      final taches = await t.runAsync(() => service.getTachesProjet(p));
+      final parTitre = {for (final x in taches!) x.titre: x};
+      expect(parTitre.keys, unorderedEquals(['Charte v2', 'Recette']));
+      // Dates enchaînées : 2 j, puis 3 j (décochée), puis 1 j.
+      expect(parTitre['Charte v2']!.dateDebut, jour(0));
+      expect(parTitre['Charte v2']!.dateFin, jour(1));
+      expect(parTitre['Recette']!.dateDebut, jour(5));
+      expect(parTitre['Recette']!.dateFin, jour(5));
+      expect(parTitre['Recette']!.roleRequis, UserRole.scrumMaster);
+      for (final x in taches) {
+        expect(x.utilisateurId, isNull);
+        expect(x.statut, StatutTache.aFaire);
+      }
+    });
+
+    testWidgets('titre vidé sur une suggestion cochée : refusé', (t) async {
+      final p = await ouvrirDetail(
+          t, ia((_) => http.Response(reponseGemini(troisSuggestions), 200)));
+      await taper(t, find.text('Suggérer des tâches'));
+
+      await t.enterText(
+          find.widgetWithText(TextFormField, 'Charte graphique'), '  ');
+      await taper(t, find.text('Créer 3 tâche(s)'));
+
+      expect(find.text('Le titre est obligatoire'), findsOneWidget);
+      expect(await t.runAsync(() => service.getTachesProjet(p)), isEmpty);
+    });
+
+    testWidgets('erreur réseau : message, Réessayer, rien de créé',
+        (t) async {
+      final p = await ouvrirDetail(
+          t,
+          ia((appel) => appel == 1
+              ? throw http.ClientException('hors ligne')
+              : http.Response(reponseGemini(troisSuggestions), 200)));
+
+      await taper(t, find.text('Suggérer des tâches'));
+      expect(find.textContaining('Pas de connexion'), findsOneWidget);
+      expect(await t.runAsync(() => service.getTachesProjet(p)), isEmpty);
+
+      await taper(t, find.text('Réessayer'));
+      expect(find.text('Créer 3 tâche(s)'), findsOneWidget);
+      expect(appelsIa, 2);
+    });
+
+    testWidgets('JSON malformé : message, pas de plantage', (t) async {
+      await ouvrirDetail(
+          t,
+          ia((_) => http.Response(
+              jsonEncode({
+                'candidates': [
+                  {
+                    'content': {
+                      'parts': [
+                        {'text': '[{"titre": "Logo", "descr'}
+                      ]
+                    }
+                  }
+                ]
+              }),
+              200)));
+
+      await taper(t, find.text('Suggérer des tâches'));
+      expect(find.textContaining('JSON valide'), findsOneWidget);
+      expect(find.text('Réessayer'), findsOneWidget);
+    });
+
+    testWidgets('liste vide : état vide explicite', (t) async {
+      await ouvrirDetail(t, ia((_) => http.Response(reponseGemini([]), 200)));
+      await taper(t, find.text('Suggérer des tâches'));
+      expect(find.text('L\'IA n\'a proposé aucune tâche exploitable.'),
+          findsOneWidget);
+    });
+
+    testWidgets('droits perdus avant de créer : refus, rien de créé',
+        (t) async {
+      final p = await ouvrirDetail(
+          t, ia((_) => http.Response(reponseGemini(troisSuggestions), 200)));
+      await taper(t, find.text('Suggérer des tâches'));
+
+      acteurCourant = commeActeur(autreScrum);
+      await taper(t, find.text('Créer 3 tâche(s)'));
+
+      expect(
+          find.text('Seuls le créateur du projet ou un administrateur '
+              'peuvent faire cette action.'),
+          findsOneWidget);
+      expect(find.text('Suggestions IA'), findsOneWidget);
+      expect(await t.runAsync(() => service.getTachesProjet(p)), isEmpty);
     });
   });
 

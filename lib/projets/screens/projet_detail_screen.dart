@@ -6,17 +6,24 @@ import '../../widgets/role_badge.dart';
 import '../models/projet.dart';
 import '../models/tache.dart';
 import '../services/projet_service.dart';
+import '../services/suggestion_service.dart';
 import '../ui/projet_widgets.dart';
 import 'affectation_screen.dart';
 import 'projet_form_screen.dart';
+import 'suggestions_screen.dart';
 import 'tache_form_screen.dart';
 
 /// Détail d'un projet et de ses tâches.
 class ProjetDetailScreen extends StatefulWidget {
-  const ProjetDetailScreen(
-      {super.key, required this.service, required this.projet});
+  const ProjetDetailScreen({
+    super.key,
+    required this.service,
+    required this.projet,
+    this.suggestions,
+  });
   final ProjetService service;
   final Projet projet;
+  final SuggestionService? suggestions;
 
   @override
   State<ProjetDetailScreen> createState() => _ProjetDetailScreenState();
@@ -24,6 +31,8 @@ class ProjetDetailScreen extends StatefulWidget {
 
 class _ProjetDetailScreenState extends State<ProjetDetailScreen> {
   late Future<(Projet?, List<Tache>, Map<int, User>)> _donnees;
+  late final SuggestionService _suggestions =
+      widget.suggestions ?? SuggestionService();
 
   @override
   void initState() {
@@ -88,7 +97,22 @@ class _ProjetDetailScreenState extends State<ProjetDetailScreen> {
     }
   }
 
-  Widget _carteProjet(Projet projet) {
+  /// Sans clé, on l'explique tout de suite au lieu d'ouvrir un écran vide.
+  void _suggerer(Projet projet) {
+    if (!_suggestions.estConfiguree) {
+      ssMessage(
+        context,
+        'Suggestions IA indisponibles : aucune clé API Gemini n\'est '
+        'configurée (voir lib/projets/config/gemini.example.json).',
+        erreur: true,
+      );
+      return;
+    }
+    _ouvrir(SuggestionsScreen(
+        service: widget.service, suggestions: _suggestions, projet: projet));
+  }
+
+  Widget _carteProjet(Projet projet, {required bool peutGerer}) {
     return SsCarte(
       child: SizedBox(
         width: double.infinity,
@@ -99,6 +123,17 @@ class _ProjetDetailScreenState extends State<ProjetDetailScreen> {
             const SizedBox(height: 6),
             Text('Créé le ${afficherDate(projet.dateCreation)}',
                 style: SsText.secondaire),
+            if (peutGerer)
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: () => _suggerer(projet),
+                  icon: const Icon(Icons.auto_awesome,
+                      color: SsColors.primaire),
+                  label: const Text('Suggérer des tâches',
+                      style: TextStyle(color: SsColors.primaire)),
+                ),
+              ),
           ],
         ),
       ),
@@ -229,7 +264,9 @@ class _ProjetDetailScreenState extends State<ProjetDetailScreen> {
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
               itemCount: 1 + (taches.isEmpty ? 1 : taches.length),
               itemBuilder: (context, i) {
-                if (i == 0) return _carteProjet(projet);
+                if (i == 0) {
+                  return _carteProjet(projet, peutGerer: peutGerer);
+                }
                 if (taches.isEmpty) {
                   return const EtatVide(
                     icone: Icons.checklist,
