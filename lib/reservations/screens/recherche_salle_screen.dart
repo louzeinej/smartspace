@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/reservation.dart';
 import '../models/salle.dart';
+import '../services/jours_feries_service.dart';
 import '../services/reservation_service.dart';
 import '../ui/smartspace_style.dart';
 
@@ -12,8 +13,10 @@ class RechercheSalleScreen extends StatefulWidget {
     required this.service,
     required this.utilisateurId,
     this.onReservee,
+    this.joursFeries,
   });
   final ReservationService service;
+  final JoursFeriesService? joursFeries;
   final int utilisateurId;
   final VoidCallback? onReservee;
 
@@ -34,6 +37,23 @@ class _RechercheSalleScreenState extends State<RechercheSalleScreen> {
   String? _rDate, _rDebut, _rFin;
   int? _rNb;
 
+  // Valeur ajoutée : jour férié de la date choisie (API Nager.Date).
+  late final JoursFeriesService _feries = widget.joursFeries ?? JoursFeriesService();
+  String? _jourFerie;
+
+  @override
+  void initState() {
+    super.initState();
+    _verifierJourFerie();
+  }
+
+  Future<void> _verifierJourFerie() async {
+    final date = formatDate(_date);
+    final nom = await _feries.jourFerie(date);
+    // Ignore la réponse si l'utilisateur a changé de date entre-temps.
+    if (mounted && formatDate(_date) == date) setState(() => _jourFerie = nom);
+  }
+
   @override
   void dispose() {
     _objet.dispose();
@@ -49,7 +69,12 @@ class _RechercheSalleScreenState extends State<RechercheSalleScreen> {
       firstDate: DateTime(now.year, now.month, now.day),
       lastDate: now.add(const Duration(days: 365)),
     );
-    if (d != null) setState(() => _date = d);
+    if (d == null) return;
+    setState(() {
+      _date = d;
+      _jourFerie = null;
+    });
+    _verifierJourFerie();
   }
 
   Future<void> _choisirHeure(bool debut) async {
@@ -177,6 +202,7 @@ class _RechercheSalleScreenState extends State<RechercheSalleScreen> {
                   _selecteur(Icons.calendar_today_outlined, 'Date',
                       afficherDate(formatDate(_date)), _choisirDate),
                 ]),
+                if (_jourFerie != null) SsAlerteFerie(nom: _jourFerie!),
                 const SizedBox(height: 12),
                 Row(children: [
                   _selecteur(Icons.schedule, 'Début', formatHeure(_debut),

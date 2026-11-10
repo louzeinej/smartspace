@@ -3,8 +3,9 @@ import 'package:flutter/material.dart';
 import '../models/reservation.dart';
 import '../services/reservation_service.dart';
 import '../ui/smartspace_style.dart';
+import 'modifier_reservation_screen.dart';
 
-/// Réservations de l'utilisateur connecté, avec annulation.
+/// Réservations de l'utilisateur connecté, avec modification et annulation.
 class MesReservationsScreen extends StatefulWidget {
   const MesReservationsScreen(
       {super.key, required this.service, required this.utilisateurId});
@@ -36,6 +37,16 @@ class MesReservationsScreenState extends State<MesReservationsScreen> {
     final heure = formatHeure(TimeOfDay.fromDateTime(maintenant));
     return r.date.compareTo(aujourdhui) < 0 ||
         (r.date == aujourdhui && r.heureFin.compareTo(heure) <= 0);
+  }
+
+  Future<void> _modifier(Reservation r) async {
+    final modifie = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+          builder: (_) =>
+              ModifierReservationScreen(service: widget.service, reservation: r)),
+    );
+    if (modifie == true) recharger();
   }
 
   Future<void> _annuler(Reservation r) async {
@@ -127,6 +138,12 @@ class MesReservationsScreenState extends State<MesReservationsScreen> {
                         ],
                       ),
                     ),
+                    if (!passee)
+                      IconButton(
+                        tooltip: 'Modifier',
+                        icon: const Icon(Icons.edit_outlined, color: SsColors.primaire),
+                        onPressed: () => _modifier(r),
+                      ),
                     if (!passee)
                       IconButton(
                         tooltip: 'Annuler',

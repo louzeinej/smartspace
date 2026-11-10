@@ -14,7 +14,7 @@ class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._();
 
   static const _nom = 'smartspace.db';
-  static const _version = 4; // v4 : téléphone (reset par SMS simulé)
+  static const _version = 5; // v4 : téléphone (reset par SMS simulé) · v5 : jours_feries (Réservations)
 
   Database? _db;
 
