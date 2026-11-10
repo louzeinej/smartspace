@@ -5,8 +5,17 @@ import 'database_service.dart';
 class ActiviteService {
   final DatabaseService _dbService = DatabaseService.instance;
 
+  // Règle : le minimum doit être entre 0 et la capacité maximale
+  void _verifierMinimum(Activite activite) {
+    if (activite.capaciteMin < 0 ||
+        activite.capaciteMin > activite.capaciteMax) {
+      throw Exception('Le minimum ne peut pas dépasser la capacité maximale.');
+    }
+  }
+
   // CREATE : ajouter une activité
   Future<int> ajouter(Activite activite) async {
+    _verifierMinimum(activite);
     final db = await _dbService.database;
     return await db.insert('activites', activite.toMap());
   }
@@ -38,6 +47,7 @@ class ActiviteService {
   // Règle : on ne peut pas mettre une capacité plus petite
   // que le nombre d'inscrits actuel
   Future<int> modifier(Activite activite) async {
+    _verifierMinimum(activite);
     final inscrits = await compterInscrits(activite.id!);
     if (activite.capaciteMax < inscrits) {
       throw Exception(

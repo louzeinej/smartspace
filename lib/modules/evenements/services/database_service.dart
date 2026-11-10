@@ -22,7 +22,7 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 4,
+      version: 5,
       onConfigure: (db) async {
         // Active les liens entre les tables
         await db.execute('PRAGMA foreign_keys = ON');
@@ -54,6 +54,7 @@ class DatabaseService {
         heure_debut TEXT NOT NULL,
         heure_fin TEXT NOT NULL,
         capacite_max INTEGER NOT NULL,
+        capacite_min INTEGER NOT NULL DEFAULT 0,
         categorie TEXT NOT NULL,
         FOREIGN KEY (evenement_id) REFERENCES evenements (id)
           ON DELETE CASCADE
@@ -80,6 +81,7 @@ class DatabaseService {
   // Passage de la version 1 à la version 2 : ajoute la colonne image
   // Passage à la version 3 : ajoute des activités d'exemple
   // Passage à la version 4 : ajoute nombre_personnes aux participations
+  // Passage à la version 5 : ajoute capacite_min aux activités
   Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
       await db.execute('ALTER TABLE evenements ADD COLUMN image TEXT');
@@ -92,6 +94,12 @@ class DatabaseService {
       // Nombre de personnes par participation (les anciennes comptent pour 1)
       await db.execute(
         'ALTER TABLE participations ADD COLUMN nombre_personnes INTEGER NOT NULL DEFAULT 1',
+      );
+    }
+    if (oldVersion < 5) {
+      // Minimum de participants (0 = pas de minimum)
+      await db.execute(
+        'ALTER TABLE activites ADD COLUMN capacite_min INTEGER NOT NULL DEFAULT 0',
       );
     }
   }

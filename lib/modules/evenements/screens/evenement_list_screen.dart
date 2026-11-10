@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../entities/evenement.dart';
 import '../entities/utilisateur_courant.dart';
+import '../services/donnees_demo_service.dart';
 import '../services/evenement_service.dart';
 import 'evenement_detail_screen.dart';
 import 'evenement_form_screen.dart';
 import 'image_evenement.dart';
+import 'statistiques_screen.dart';
 
 class EvenementListScreen extends StatefulWidget {
   const EvenementListScreen({super.key});
@@ -42,6 +44,8 @@ class _EvenementListScreenState extends State<EvenementListScreen> {
   // Appelée à chaque défilement : on ne met à jour l'écran
   // que si le bouton doit apparaître ou disparaître
   void _surDefilement() {
+    // Le controller doit être attaché à une liste avant de lire sa position
+    if (!_scrollController.hasClients) return;
     final doitEtreVisible = _scrollController.offset > 200;
     if (doitEtreVisible != _afficherBoutonHaut) {
       setState(() {
@@ -87,6 +91,40 @@ class _EvenementListScreenState extends State<EvenementListScreen> {
     }
   }
 
+  // Ajoute des activités de démo, prévient l'utilisateur, puis recharge
+  Future<void> ajouterDonneesDemo() async {
+    final nombre = await DonneesDemoService().insererDonneesDemo();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: const Color(0xFF2ECC71),
+        content: Text(
+          nombre == 0
+              ? 'Aucune activité à ajouter : tous les événements en ont déjà'
+              : '$nombre activité(s) ajoutée(s)',
+        ),
+      ),
+    );
+    await chargerEvenements();
+  }
+
+  // Inscrit l'employé courant à plusieurs activités (démo) et prévient
+  Future<void> inscrireEmployeCourant() async {
+    final nombre = await DonneesDemoService()
+        .inscrireUtilisateurAuxActivites(UtilisateurCourant.id);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: const Color(0xFF2ECC71),
+        content: Text(
+          nombre == 0
+              ? 'Aucune activité disponible : lance d\'abord l\'outil de données de démo'
+              : '${UtilisateurCourant.nom()} inscrit à $nombre activité(s)',
+        ),
+      ),
+    );
+  }
+
   // Ouvre le dialogue de simulation, puis change l'employé connecté
   Future<void> simulerConnexion() async {
     final numero = await showDialog<int>(
@@ -123,7 +161,32 @@ class _EvenementListScreenState extends State<EvenementListScreen> {
       appBar: AppBar(
         title: const Text('Événements'),
         actions: [
-          // Outil de simulation de connexion : visible seulement en développement
+          // Statistiques de participation (visible pour tous)
+          IconButton(
+            icon: const Icon(Icons.bar_chart, color: Colors.white),
+            tooltip: 'Statistiques',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const StatistiquesScreen(),
+                ),
+              );
+            },
+          ),
+          // Outils de développement : visibles seulement en mode debug
+          if (kDebugMode)
+            IconButton(
+              icon: const Icon(Icons.dataset, color: Colors.white),
+              tooltip: 'Ajouter des données de démo',
+              onPressed: ajouterDonneesDemo,
+            ),
+          if (kDebugMode)
+            IconButton(
+              icon: const Icon(Icons.playlist_add_check, color: Colors.white),
+              tooltip: 'Inscrire l\'employé courant à des activités (démo)',
+              onPressed: inscrireEmployeCourant,
+            ),
           if (kDebugMode)
             IconButton(
               icon: const Icon(Icons.account_circle, color: Colors.white),

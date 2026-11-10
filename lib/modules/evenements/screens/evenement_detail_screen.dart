@@ -1,7 +1,12 @@
+import 'dart:math';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+
 import '../entities/activite.dart';
 import '../entities/evenement.dart';
+import '../entities/regles_participation.dart';
+import '../entities/statut_activite.dart';
 import '../entities/utilisateur_courant.dart';
 import '../services/activite_service.dart';
 import '../services/participation_service.dart';
@@ -15,8 +20,15 @@ class _ActiviteAvecInscrits {
   final int inscrits;
   // Nombre de personnes inscrites par l'utilisateur courant (0 = pas inscrit)
   final int mesPersonnes;
+  // Titre de l'activité en conflit d'horaires (null = pas de conflit)
+  final String? conflit;
 
-  _ActiviteAvecInscrits(this.activite, this.inscrits, this.mesPersonnes);
+  _ActiviteAvecInscrits(
+    this.activite,
+    this.inscrits,
+    this.mesPersonnes,
+    this.conflit,
+  );
 
   bool get participe => mesPersonnes > 0;
 }
@@ -32,6 +44,9 @@ class ChoixNombrePersonnes extends StatefulWidget {
   final int minimum;
   // Titre du dialogue
   final String titre;
+  // true si le maximum vient de la règle "personnes par inscription"
+  // (et non du nombre de places restantes)
+  final bool limiteParRegle;
 
   const ChoixNombrePersonnes({
     super.key,
@@ -39,6 +54,7 @@ class ChoixNombrePersonnes extends StatefulWidget {
     this.initial = 1,
     this.minimum = 1,
     this.titre = 'Combien de personnes participent ?',
+    this.limiteParRegle = false,
   });
 
   @override
@@ -58,26 +74,39 @@ class _ChoixNombrePersonnesState extends State<ChoixNombrePersonnes> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: Text(widget.titre),
-      content: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // "−" désactivé quand on est au minimum
-          IconButton(
-            icon: const Icon(Icons.remove),
-            onPressed: _nombre > widget.minimum
-                ? () => setState(() => _nombre--)
-                : null,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // "−" désactivé quand on est au minimum
+              IconButton(
+                icon: const Icon(Icons.remove),
+                onPressed: _nombre > widget.minimum
+                    ? () => setState(() => _nombre--)
+                    : null,
+              ),
+              Text(
+                '$_nombre',
+                style:
+                    const TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+              ),
+              // "+" désactivé quand on atteint le maximum
+              IconButton(
+                icon: const Icon(Icons.add),
+                onPressed: _nombre < widget.maximum
+                    ? () => setState(() => _nombre++)
+                    : null,
+              ),
+            ],
           ),
+          // Explique d'où vient le maximum
           Text(
-            '$_nombre',
-            style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
-          ),
-          // "+" désactivé quand on atteint le maximum
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: _nombre < widget.maximum
-                ? () => setState(() => _nombre++)
-                : null,
+            widget.limiteParRegle
+                ? 'Maximum $maxPersonnesParInscription personnes par inscription'
+                : 'Maximum : ${widget.maximum} place(s) restante(s)',
+            style: const TextStyle(fontSize: 12, color: Colors.grey),
           ),
         ],
       ),
@@ -118,16 +147,70 @@ class _EvenementDetailScreenState extends State<EvenementDetailScreen> {
   static const Color fond = Color(0xFFF7F7FB);
   static const Color rouge = Color(0xFFFF6B6B);
   static const Color vert = Color(0xFF2ECC71);
+  static const Color orange = Color(0xFFF5A623);
+  static const Color rougeFonce = Color(0xFFC0392B);
 
   final ActiviteService _activiteService = ActiviteService();
   final ParticipationService _participationService = ParticipationService();
   List<_ActiviteAvecInscrits> _activites = [];
   bool _chargement = true;
+  // Contrôle le défilement de la page (utilisé aussi par la barre de défilement)
+  late final ScrollController _scrollController;
+  // Quels boutons de défilement sont visibles ?
+  bool _montrerHaut = false;
+  bool _montrerBas = false;
 
   @override
   void initState() {
     super.initState();
+    _scrollController = ScrollController();
+    _scrollController.addListener(_majBoutonsDefilement);
     chargerActivites();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_majBoutonsDefilement);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  // Met à jour la visibilité des boutons ↑ et ↓ selon la position de la page
+  void _majBoutonsDefilement() {
+    if (!_scrollController.hasClients) return;
+    final position = _scrollController.position;
+    final haut = position.pixels > 100;
+    final bas = position.pixels < position.maxScrollExtent - 20;
+    // On redessine seulement si une valeur change
+    if (haut != _montrerHaut || bas != _montrerBas) {
+      setState(() {
+        _montrerHaut = haut;
+        _montrerBas = bas;
+      });
+    }
+  }
+
+  // Remonte tout en haut de la page
+  void _allerEnHaut() {
+    if (!_scrollController.hasClients) return;
+    _scrollController.animateTo(
+      0,
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.easeOut,
+    );
+  }
+
+  // Descend d'environ 350 px (sans dépasser le bas de la page)
+  void _descendre() {
+    if (!_scrollController.hasClients) return;
+    _scrollController.animateTo(
+      min(
+        _scrollController.offset + 350,
+        _scrollController.position.maxScrollExtent,
+      ),
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOut,
+    );
   }
 
   // Lit les activités de l'événement, puis le nombre d'inscrits de chacune
@@ -140,18 +223,29 @@ class _EvenementDetailScreenState extends State<EvenementDetailScreen> {
         final inscrits = await _activiteService.compterInscrits(activite.id!);
         // Combien de personnes l'utilisateur courant a-t-il inscrites ?
         // (0 s'il ne participe pas)
-        final mesPersonnes =
-            await _participationService.nombrePersonnesInscrites(
-          activite.id!,
-          UtilisateurCourant.id,
+        final mesPersonnes = await _participationService
+            .nombrePersonnesInscrites(activite.id!, UtilisateurCourant.id);
+        // Conflit d'horaires : seulement si l'utilisateur ne participe pas
+        String? conflit;
+        if (mesPersonnes == 0) {
+          conflit = await _participationService.trouverConflitHoraire(
+            activite.id!,
+            UtilisateurCourant.id,
+          );
+        }
+        resultat.add(
+          _ActiviteAvecInscrits(activite, inscrits, mesPersonnes, conflit),
         );
-        resultat.add(_ActiviteAvecInscrits(activite, inscrits, mesPersonnes));
       }
     }
     if (!mounted) return;
     setState(() {
       _activites = resultat;
       _chargement = false;
+    });
+    // Une fois la page dessinée, on regarde s'il y a du contenu en dessous
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _majBoutonsDefilement();
     });
   }
 
@@ -196,9 +290,8 @@ class _EvenementDetailScreenState extends State<EvenementDetailScreen> {
 
   // Affiche un message en bas de l'écran
   void _afficherMessage(String texte, Color couleur) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(backgroundColor: couleur, content: Text(texte)),
-    );
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(backgroundColor: couleur, content: Text(texte)));
   }
 
   // Inscrit l'utilisateur courant à l'activité
@@ -211,7 +304,11 @@ class _EvenementDetailScreenState extends State<EvenementDetailScreen> {
     if (restantes > 1) {
       final choix = await showDialog<int>(
         context: context,
-        builder: (context) => ChoixNombrePersonnes(maximum: restantes),
+        builder: (context) => ChoixNombrePersonnes(
+          // Le plus petit entre les places restantes et la limite par inscription
+          maximum: min(restantes, maxPersonnesParInscription),
+          limiteParRegle: restantes > maxPersonnesParInscription,
+        ),
       );
       // Dialogue annulé : on ne fait rien
       if (choix == null) return;
@@ -238,8 +335,10 @@ class _EvenementDetailScreenState extends State<EvenementDetailScreen> {
   Future<void> modifierParticipation(_ActiviteAvecInscrits element) async {
     final activite = element.activite;
     final restantes = activite.capaciteMax - element.inscrits;
-    // Maximum = nombre actuel + places encore libres
-    final maximum = element.mesPersonnes + restantes;
+    // Places pour ce groupe = nombre actuel + places encore libres
+    final placesGroupe = element.mesPersonnes + restantes;
+    // Maximum = le plus petit entre ces places et la limite par inscription
+    final maximum = min(placesGroupe, maxPersonnesParInscription);
 
     final choix = await showDialog<int>(
       context: context,
@@ -247,6 +346,7 @@ class _EvenementDetailScreenState extends State<EvenementDetailScreen> {
         titre: 'Modifier le nombre de personnes',
         initial: element.mesPersonnes,
         maximum: maximum,
+        limiteParRegle: placesGroupe > maxPersonnesParInscription,
       ),
     );
     // Annulé ou nombre identique : on ne fait rien
@@ -307,8 +407,67 @@ class _EvenementDetailScreenState extends State<EvenementDetailScreen> {
     await chargerActivites();
   }
 
+  // Ligne d'information sur le minimum de participants
+  Widget _ligneMinimum(int minimum, int inscrits, StatutActivite statut) {
+    final IconData icone;
+    final Color couleur;
+    final String texte;
+    if (statut == StatutActivite.annulee) {
+      icone = Icons.cancel;
+      couleur = rougeFonce;
+      texte = 'Activité annulée : minimum de $minimum personnes non atteint';
+    } else if (inscrits >= minimum) {
+      icone = Icons.check_circle;
+      couleur = vert;
+      texte = 'Minimum atteint : activité confirmée';
+    } else {
+      icone = Icons.warning_amber;
+      couleur = orange;
+      texte = 'Pas assez de participants : minimum requis $minimum personnes '
+          '(il en manque ${minimum - inscrits})';
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icone, size: 12, color: couleur),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Text(texte, style: TextStyle(fontSize: 12, color: couleur)),
+          ),
+        ],
+      ),
+    );
+  }
+
   // Construit la zone du bas de la carte : bouton selon la situation
-  Widget _zoneParticipation(_ActiviteAvecInscrits element, bool complet) {
+  Widget _zoneParticipation(
+    _ActiviteAvecInscrits element,
+    StatutActivite statut,
+  ) {
+    // Activité annulée et l'utilisateur y était inscrit : pas de boutons
+    if (element.participe && statut == StatutActivite.annulee) {
+      return const Row(
+        children: [
+          Icon(Icons.cancel, color: rougeFonce),
+          SizedBox(width: 6),
+          Expanded(child: Text('Activité annulée')),
+        ],
+      );
+    }
+
+    // Cas 0 : activité terminée et l'utilisateur y a participé : pas de boutons
+    if (element.participe && statut == StatutActivite.terminee) {
+      return const Row(
+        children: [
+          Icon(Icons.check_circle, color: vert),
+          SizedBox(width: 6),
+          Expanded(child: Text('Vous avez participé')),
+        ],
+      );
+    }
+
     // Cas 1 : l'utilisateur participe déjà
     if (element.participe) {
       return Column(
@@ -355,21 +514,51 @@ class _EvenementDetailScreenState extends State<EvenementDetailScreen> {
       );
     }
 
-    // Cas 2 et 3 : bouton pleine largeur (grisé si l'activité est complète)
-    return SizedBox(
-      width: double.infinity,
-      height: 44,
-      child: ElevatedButton(
-        onPressed: complet ? null : () => participer(element),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: violet,
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+    // Texte du bouton, par ordre de priorité :
+    // inscriptions fermées, complet, conflit d'horaires, sinon Participer
+    final conflit = element.conflit;
+    final ferme =
+        statut == StatutActivite.terminee || statut == StatutActivite.enCours;
+    final complet = statut == StatutActivite.complete;
+    final annulee = statut == StatutActivite.annulee;
+    final bloque = annulee || ferme || complet || conflit != null;
+    final texte = annulee
+        ? 'Activité annulée'
+        : (ferme
+            ? 'Inscriptions fermées'
+            : (complet
+                ? 'Complet'
+                : (conflit != null ? "Conflit d'horaires" : 'Participer')));
+
+    // Cas 2 et 3 : bouton pleine largeur (grisé si on ne peut pas participer)
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: double.infinity,
+          height: 44,
+          child: ElevatedButton(
+            onPressed: bloque ? null : () => participer(element),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: violet,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: Text(texte),
           ),
         ),
-        child: Text(complet ? 'Complet' : 'Participer'),
-      ),
+        // Explication du conflit sous le bouton
+        if (conflit != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(
+              'Vous participez déjà à « $conflit » sur ce créneau.',
+              style: const TextStyle(color: rouge, fontSize: 12),
+            ),
+          ),
+      ],
     );
   }
 
@@ -377,7 +566,15 @@ class _EvenementDetailScreenState extends State<EvenementDetailScreen> {
   Widget _carteActivite(_ActiviteAvecInscrits element) {
     final activite = element.activite;
     final inscrits = element.inscrits;
-    final complet = inscrits >= activite.capaciteMax;
+    // Statut automatique de l'activité
+    final statut = calculerStatut(
+      dateEvenement: widget.evenement.date,
+      heureDebut: activite.heureDebut,
+      heureFin: activite.heureFin,
+      capaciteMax: activite.capaciteMax,
+      inscrits: inscrits,
+      capaciteMin: activite.capaciteMin,
+    );
     final restantes = activite.capaciteMax - inscrits;
     // Valeur entre 0 et 1 pour la barre de progression
     final progression = activite.capaciteMax > 0
@@ -406,6 +603,20 @@ class _EvenementDetailScreenState extends State<EvenementDetailScreen> {
                     ),
                   ),
                 ),
+                // Badge du statut
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: statut.couleur,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    statut.libelle,
+                    style: const TextStyle(color: Colors.white, fontSize: 12),
+                  ),
+                ),
+                const SizedBox(width: 6),
                 Chip(
                   label: Text(activite.categorie),
                   backgroundColor: violet.withValues(alpha: 0.12),
@@ -428,7 +639,13 @@ class _EvenementDetailScreenState extends State<EvenementDetailScreen> {
             Text('${activite.heureDebut} - ${activite.heureFin}'),
             const SizedBox(height: 12),
             // Places : texte + barre
-            Text('$inscrits / ${activite.capaciteMax} places'),
+            Text(
+              '$inscrits / ${activite.capaciteMax} places '
+              '(${pourcentageOccupation(inscrits, activite.capaciteMax)} %)',
+            ),
+            // Info sur le minimum de participants (seulement s'il y en a un)
+            if (activite.capaciteMin > 0)
+              _ligneMinimum(activite.capaciteMin, inscrits, statut),
             const SizedBox(height: 6),
             LinearProgressIndicator(
               value: progression,
@@ -438,34 +655,17 @@ class _EvenementDetailScreenState extends State<EvenementDetailScreen> {
               borderRadius: BorderRadius.circular(4),
             ),
             const SizedBox(height: 10),
-            // Badge "Complet" ou nombre de places restantes
-            if (complet)
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                decoration: BoxDecoration(
-                  color: rouge,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Text(
-                  'Complet',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              )
-            else
-              Text(
-                '$restantes places restantes',
-                style: const TextStyle(
-                  color: vert,
-                  fontWeight: FontWeight.bold,
-                ),
+            // Nombre de places restantes
+            Text(
+              '$restantes places restantes',
+              style: const TextStyle(
+                color: vert,
+                fontWeight: FontWeight.bold,
               ),
+            ),
             const SizedBox(height: 12),
-            // Bouton Participer / Se désinscrire / Complet
-            _zoneParticipation(element, complet),
+            // Bouton Participer / Se désinscrire / Inscriptions fermées...
+            _zoneParticipation(element, statut),
           ],
         ),
       ),
@@ -479,87 +679,117 @@ class _EvenementDetailScreenState extends State<EvenementDetailScreen> {
     return Scaffold(
       backgroundColor: fond,
       appBar: AppBar(title: Text(evenement.titre)),
-      // Toute la page défile (infos en haut, activités en dessous)
-      body: ListView(
-        padding: const EdgeInsets.only(bottom: 24),
+      // Boutons de défilement par simple clic
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // Photo de l'événement
-          ImageEvenement(image: evenement.image, height: 180),
-          // Rappel discret de l'employé connecté (seulement en développement)
-          if (kDebugMode)
+          if (_montrerHaut)
+            FloatingActionButton.small(
+              heroTag: 'detail_defiler_haut',
+              backgroundColor: violet,
+              foregroundColor: Colors.white,
+              onPressed: _allerEnHaut,
+              child: const Icon(Icons.arrow_upward),
+            ),
+          if (_montrerHaut && _montrerBas) const SizedBox(height: 8),
+          if (_montrerBas)
+            FloatingActionButton.small(
+              heroTag: 'detail_defiler_bas',
+              backgroundColor: violet,
+              foregroundColor: Colors.white,
+              onPressed: _descendre,
+              child: const Icon(Icons.arrow_downward),
+            ),
+        ],
+      ),
+      // Toute la page défile (infos en haut, activités en dessous)
+      body: Scrollbar(
+        controller: _scrollController,
+        thumbVisibility: true,
+        child: ListView(
+          controller: _scrollController,
+          physics: const AlwaysScrollableScrollPhysics(),
+          // Grand espace en bas : la dernière carte reste visible en entier
+          padding: const EdgeInsets.only(bottom: 96),
+          children: [
+            // Photo de l'événement
+            ImageEvenement(image: evenement.image, height: 180),
+            // Rappel discret de l'employé connecté (seulement en développement)
+            if (kDebugMode)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                child: Row(
+                  children: [
+                    const Icon(Icons.person, size: 16, color: Colors.grey),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Connecté en tant que : ${UtilisateurCourant.nom()}',
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                  ],
+                ),
+              ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-              child: Row(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.person, size: 16, color: Colors.grey),
-                  const SizedBox(width: 6),
                   Text(
-                    'Connecté en tant que : ${UtilisateurCourant.nom()}',
-                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    evenement.titre,
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(Icons.calendar_today, size: 16, color: violet),
+                      const SizedBox(width: 6),
+                      Text(evenement.date),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(Icons.place, size: 16, color: violet),
+                      const SizedBox(width: 6),
+                      Expanded(child: Text(evenement.lieu)),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(evenement.description),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Activités',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 12),
+                  // Bouton pour ajouter une activité
+                  ElevatedButton.icon(
+                    onPressed: () => ouvrirFormulaire(),
+                    icon: const Icon(Icons.add),
+                    label: const Text('Ajouter une activité'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: violet,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  if (_chargement)
+                    const Center(child: CircularProgressIndicator())
+                  else if (_activites.isEmpty)
+                    const Text('Aucune activité pour cet événement')
+                  else
+                    ..._activites.map(_carteActivite),
                 ],
               ),
             ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  evenement.titre,
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    const Icon(Icons.calendar_today, size: 16, color: violet),
-                    const SizedBox(width: 6),
-                    Text(evenement.date),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    const Icon(Icons.place, size: 16, color: violet),
-                    const SizedBox(width: 6),
-                    Expanded(child: Text(evenement.lieu)),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Text(evenement.description),
-                const SizedBox(height: 24),
-                const Text(
-                  'Activités',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 12),
-                // Bouton pour ajouter une activité
-                ElevatedButton.icon(
-                  onPressed: () => ouvrirFormulaire(),
-                  icon: const Icon(Icons.add),
-                  label: const Text('Ajouter une activité'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: violet,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                if (_chargement)
-                  const Center(child: CircularProgressIndicator())
-                else if (_activites.isEmpty)
-                  const Text('Aucune activité pour cet événement')
-                else
-                  ..._activites.map(_carteActivite),
-              ],
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

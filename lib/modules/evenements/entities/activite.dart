@@ -6,6 +6,8 @@ class Activite {
   final String heureDebut;
   final String heureFin;
   final int capaciteMax;
+  // Minimum de participants (0 = pas de minimum)
+  final int capaciteMin;
   final String categorie;
 
   Activite({
@@ -16,6 +18,7 @@ class Activite {
     required this.heureDebut,
     required this.heureFin,
     required this.capaciteMax,
+    this.capaciteMin = 0,
     required this.categorie,
   });
 
@@ -29,6 +32,7 @@ class Activite {
       'heure_debut': heureDebut,
       'heure_fin': heureFin,
       'capacite_max': capaciteMax,
+      'capacite_min': capaciteMin,
       'categorie': categorie,
     };
   }
@@ -43,6 +47,7 @@ class Activite {
       heureDebut: map['heure_debut'] as String,
       heureFin: map['heure_fin'] as String,
       capaciteMax: map['capacite_max'] as int,
+      capaciteMin: (map['capacite_min'] as int?) ?? 0,
       categorie: map['categorie'] as String,
     );
   }

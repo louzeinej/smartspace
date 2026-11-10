@@ -42,6 +42,7 @@ class _ActiviteFormScreenState extends State<ActiviteFormScreen> {
   late final TextEditingController _heureDebutController;
   late final TextEditingController _heureFinController;
   late final TextEditingController _capaciteController;
+  late final TextEditingController _capaciteMinController;
   String? _categorie;
   bool _enregistrement = false;
 
@@ -57,6 +58,9 @@ class _ActiviteFormScreenState extends State<ActiviteFormScreen> {
     _heureFinController = TextEditingController(text: a?.heureFin ?? '');
     _capaciteController =
         TextEditingController(text: a != null ? '${a.capaciteMax}' : '');
+    // Minimum de participants : 0 par défaut
+    _capaciteMinController =
+        TextEditingController(text: a != null ? '${a.capaciteMin}' : '0');
     // Si la catégorie enregistrée n'est pas dans la liste, on ne la choisit pas
     if (a != null && categories.contains(a.categorie)) {
       _categorie = a.categorie;
@@ -71,6 +75,7 @@ class _ActiviteFormScreenState extends State<ActiviteFormScreen> {
     _heureDebutController.dispose();
     _heureFinController.dispose();
     _capaciteController.dispose();
+    _capaciteMinController.dispose();
     super.dispose();
   }
 
@@ -108,6 +113,7 @@ class _ActiviteFormScreenState extends State<ActiviteFormScreen> {
       heureDebut: _heureDebutController.text.trim(),
       heureFin: _heureFinController.text.trim(),
       capaciteMax: int.parse(_capaciteController.text.trim()),
+      capaciteMin: int.tryParse(_capaciteMinController.text.trim()) ?? 0,
       categorie: _categorie!,
     );
 
@@ -214,6 +220,24 @@ class _ActiviteFormScreenState extends State<ActiviteFormScreen> {
                   final nombre = int.tryParse(v.trim());
                   if (nombre == null || nombre <= 0) {
                     return 'La capacité doit être un entier supérieur à 0';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _capaciteMinController,
+                keyboardType: TextInputType.number,
+                decoration: _decoration('Minimum de participants (0 = aucun)'),
+                validator: (v) {
+                  final nombre = int.tryParse((v ?? '').trim());
+                  if (nombre == null || nombre < 0) {
+                    return 'Le minimum doit être un entier supérieur ou égal à 0';
+                  }
+                  // Le minimum ne dépasse pas la capacité maximale
+                  final max = int.tryParse(_capaciteController.text.trim());
+                  if (max != null && nombre > max) {
+                    return 'Le minimum ne peut pas dépasser la capacité maximale';
                   }
                   return null;
                 },
