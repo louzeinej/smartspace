@@ -14,7 +14,7 @@ L'application est organisée en **5 modules** accessibles depuis une barre de na
 |---|---|---|---|
 | 👤 Utilisateurs | Comptes, rôles, authentification | **Youssef Messoudi** | ✅ Intégré |
 | ✅ Projets | Projets, tâches, vérification de disponibilité | Youssef Sghaier | 🚧 À venir |
-| 🚪 Salles | Salles, réservations, recherche par critères | **Youssef Fadaoui** | ✅ Intégré |
+| 🚪 Salles | Salles, réservations (création, modification, annulation), recherche par critères, alerte jours fériés | **Youssef Fadaoui** | ✅ Intégré |
 | 💬 Réseau | Publications, actualités internes | Manar Kalai | 🚧 À venir |
 | 🎉 Événements | Activités de club, participations, capacité | Louzeine Aloui | 🚧 À venir |
 
@@ -52,6 +52,17 @@ Créés automatiquement au **premier lancement** (installation fraîche) :
 - **Assistant intelligent intégré** 🤖 : chat qui interroge la base locale (recherche de membres, statistiques par rôle, aide)
 - **Contrôle d'accès** : `core/module_access.dart` = source unique des règles, consommée par tous les modules via `Session.roleEnum`
 
+## 🚪 Module Gestion des Réservations de Salles (fonctionnalités)
+
+- **Recherche intelligente** : date, créneau et nombre de participants → seules les salles **libres et assez grandes** sont proposées, de la plus petite à la plus grande ; les salles occupées sont affichées à part avec le créneau qui les bloque
+- **Règle de chevauchement** (SQL `NOT EXISTS`) : deux créneaux se chevauchent si `début existant < fin demandée` et `fin existante > début demandé` (9h–10h puis 10h–11h est autorisé)
+- **Réservation sécurisée** : disponibilité revérifiée dans une **transaction** juste avant l'enregistrement → jamais deux réservations en conflit
+- **Mes réservations** : liste avec **modification** (objet, participants, salle, date, créneau — revérifiée en transaction) et **annulation** avec confirmation
+- **Gestion des salles** (Administrateur) : ajout, modification, suppression (numéro unique, capacité > 0)
+- **Alerte jour férié** 🎉 : à la sélection d'une date, bandeau si le jour est férié en Tunisie (API Nager.Date, voir *Web services*)
+- **SQLite** : tables `salles`, `reservations` (clé étrangère `ON DELETE CASCADE`, contraintes `CHECK`, index `(salle_id, date)`), `jours_feries` (cache de l'API) — base v5
+- **Tests** : `test/jours_feries_test.dart` (API simulée + cache, mode hors ligne, refus de chevauchement)
+
 ### Règles de rôles (ModuleAccess)
 
 | Permission | Admin | Scrum Master | RH | Autres |
@@ -87,6 +98,12 @@ lib/
 ├── widgets/                         # GradientButton, RoleBadge, UserCard, AvatarWidget
 ├── theme/app_theme.dart             # Charte graphique (violet #7F5AF0…)
 └── reservations/                    # Module Réservations de Salles (Y. Fadaoui)
+    ├── data/reservation_database.dart   # tables salles, reservations, jours_feries
+    ├── models/                          # Salle, Reservation (toMap / fromMap)
+    ├── services/reservation_service.dart # recherche, réservation, modification (transactions)
+    ├── services/jours_feries_service.dart # API Nager.Date + cache SQLite
+    ├── screens/                         # réserver, mes réservations, modifier, salles (admin)
+    └── ui/smartspace_style.dart         # composants de la charte
 ```
 
 **Base de données partagée** : chaque module ajoute ses tables dans `DatabaseHelper._onCreate` (création) et `_onUpgrade` (migrations versionnées avec `CREATE TABLE IF NOT EXISTS` / `ALTER TABLE`).
@@ -120,6 +137,7 @@ lib/
 | [DiceBear](https://www.dicebear.com) | Avatars des utilisateurs (fallback initiales offline) |
 | [random.org](https://www.random.org) | Génération des codes OTP (entropie atmosphérique) |
 | Gmail SMTP / [Brevo](https://www.brevo.com) | Envoi réel des OTP par email |
+| [Nager.Date](https://date.nager.at) | Jours fériés tunisiens (module Réservations), mis en cache dans SQLite → fonctionne hors ligne |
 
 Configuration de l'email : voir les constantes en tête de `lib/services/email_otp_service.dart` (laisser vide = mode démo simulé). ⚠️ Identifiants SMTP : à ne jamais versionner sur un dépôt public.
 
