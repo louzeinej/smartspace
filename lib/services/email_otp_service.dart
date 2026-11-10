@@ -25,8 +25,8 @@ import 'package:mailer/smtp_server.dart';
 /// secrets.
 abstract final class EmailOtpService {
   // ── Configuration Gmail SMTP ──────────────────────────────────────
-  static const String gmailUser = ''; // ex. 'youssef.messoudi@gmail.com'
-  static const String gmailAppPassword = ''; // 16 caractères, espaces OK
+  static const String gmailUser = 'youssefzarga33@gmail.com';
+  static const String gmailAppPassword = 'htto diib skna bagw'; // ⚠️ révoquer après la soutenance
 
   // ── Configuration Brevo (API) ─────────────────────────────────────
   static const String brevoApiKey = ''; // ex. 'xkeysib-abc123...'
