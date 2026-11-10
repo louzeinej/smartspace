@@ -45,6 +45,7 @@ dependencies:
   shared_preferences: ^2.2.3 # persistance de la session
   intl: ^0.19.0              # formatage des dates
   mailer: ^6.1.2              # OTP par email via SMTP Gmail (valeur ajoutée)
+  sqflite_common_ffi_web: ^1.2.1
 
 dev_dependencies:
   flutter_test:
