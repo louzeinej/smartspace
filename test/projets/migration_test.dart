@@ -7,10 +7,12 @@ import 'package:smartspace/database/user_database.dart';
 import 'package:smartspace/reservations/data/reservation_database.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
+import 'tables_attendues.dart';
+
 /// Migre une vraie base v4 avec le vrai `DatabaseHelper`, dans un dossier
 /// temporaire pour ne jamais toucher à la base de développement.
 void main() {
-  test('v4 → version courante : ajoute mes tables, garde celles des autres',
+  test('v4 → version courante : ajoute les tables, garde les données',
       () async {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
@@ -27,6 +29,7 @@ void main() {
           await UserDatabase.createTables(d);
           await UserDatabase.seedDemoUsers(d);
           await ReservationDatabase.createTables(d);
+          await d.execute('DROP TABLE jours_feries'); // absente en v4
         },
       ),
     );
@@ -46,12 +49,8 @@ void main() {
     final db = await DatabaseHelper.instance.database;
     addTearDown(db.close);
 
-    expect(await db.getVersion(), greaterThan(4));
-
-    final tables = (await db
-            .rawQuery("SELECT name FROM sqlite_master WHERE type = 'table'"))
-        .map((r) => r['name']);
-    expect(tables, containsAll(['projets', 'taches']));
+    expect(await db.getVersion(), greaterThan(5));
+    expect(await tablesDe(db), containsAll(tablesAttendues));
 
     final fk = await db.rawQuery('PRAGMA foreign_keys');
     expect(fk.first.values.first, 1);

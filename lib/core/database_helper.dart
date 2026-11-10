@@ -18,7 +18,9 @@ class DatabaseHelper {
   static const _nom = 'smartspace.db';
   // v4 : téléphone (Utilisateurs) · v5 : jours_feries + projets/taches
   //     + networking (fusions parallèles des modules)
-  static const _version = 5;
+  // v6 : rattrapage — la v5 a été attribuée en parallèle par trois modules,
+  //      un appareil déjà en v5 n'avait donc qu'une partie de leurs tables.
+  static const _version = 6;
 
   Database? _db;
 
