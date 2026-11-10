@@ -9,6 +9,7 @@ import '../entities/regles_participation.dart';
 import '../entities/statut_activite.dart';
 import '../entities/utilisateur_courant.dart';
 import '../services/activite_service.dart';
+import '../services/meteo_service.dart';
 import '../services/participation_service.dart';
 import 'activite_form_screen.dart';
 import 'image_evenement.dart';
@@ -153,6 +154,8 @@ class _EvenementDetailScreenState extends State<EvenementDetailScreen> {
   final ActiviteService _activiteService = ActiviteService();
   final ParticipationService _participationService = ParticipationService();
   List<_ActiviteAvecInscrits> _activites = [];
+  // Météo de l'événement (chargée une seule fois)
+  late final Future<MeteoPrevue?> _meteo;
   bool _chargement = true;
   // Contrôle le défilement de la page (utilisé aussi par la barre de défilement)
   late final ScrollController _scrollController;
@@ -164,6 +167,10 @@ class _EvenementDetailScreenState extends State<EvenementDetailScreen> {
   void initState() {
     super.initState();
     _scrollController = ScrollController();
+    _meteo = MeteoService().lireMeteo(
+      widget.evenement.lieu,
+      widget.evenement.date,
+    );
     _scrollController.addListener(_majBoutonsDefilement);
     chargerActivites();
   }
@@ -672,6 +679,77 @@ class _EvenementDetailScreenState extends State<EvenementDetailScreen> {
     );
   }
 
+  // Carte "Météo prévue" de l'événement
+  Widget _carteMeteo() {
+    return Card(
+      color: Colors.white,
+      elevation: 1,
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Météo prévue',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 10),
+            FutureBuilder<MeteoPrevue?>(
+              future: _meteo,
+              builder: (context, snapshot) {
+                // Pendant le chargement
+                if (snapshot.connectionState != ConnectionState.done) {
+                  return const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      color: violet,
+                      strokeWidth: 2,
+                    ),
+                  );
+                }
+                final meteo = snapshot.data;
+                // Pas de météo disponible
+                if (meteo == null) {
+                  return const Text(
+                    'Météo indisponible (hors connexion ou date hors prévisions)',
+                    style: TextStyle(color: Colors.grey),
+                  );
+                }
+                final description = decrireMeteo(meteo.codeMeteo);
+                return Row(
+                  children: [
+                    Icon(description.icone, color: violet, size: 40),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            description.libelle,
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          Text(
+                            'Min ${meteo.temperatureMin.round()}°C • '
+                            'Max ${meteo.temperatureMax.round()}°C',
+                          ),
+                          if (meteo.probabilitePluie != null)
+                            Text('Pluie : ${meteo.probabilitePluie} %'),
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final evenement = widget.evenement;
@@ -759,6 +837,8 @@ class _EvenementDetailScreenState extends State<EvenementDetailScreen> {
                   ),
                   const SizedBox(height: 12),
                   Text(evenement.description),
+                  const SizedBox(height: 16),
+                  _carteMeteo(),
                   const SizedBox(height: 24),
                   const Text(
                     'Activités',

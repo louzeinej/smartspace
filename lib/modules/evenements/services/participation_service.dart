@@ -53,6 +53,33 @@ class ParticipationService {
     return (lignes.first['nombre_personnes'] as int?) ?? 1;
   }
 
+  // Toutes les participations d'un employé, avec l'activité et l'événement
+  // (triées par date puis par heure de début)
+  Future<List<Map<String, Object?>>> lireParUtilisateur(
+    int utilisateurId,
+  ) async {
+    final db = await _dbService.database;
+    return await db.rawQuery('''
+      SELECT p.activite_id AS activite_id,
+             a.titre AS activite_titre,
+             a.categorie AS categorie,
+             a.heure_debut AS heure_debut,
+             a.heure_fin AS heure_fin,
+             a.capacite_max AS capacite_max,
+             a.capacite_min AS capacite_min,
+             p.nombre_personnes AS nombre_personnes,
+             e.id AS evenement_id,
+             e.titre AS evenement_titre,
+             e.date AS date_evenement,
+             e.lieu AS lieu
+      FROM participations p
+      JOIN activites a ON a.id = p.activite_id
+      JOIN evenements e ON e.id = a.evenement_id
+      WHERE p.utilisateur_id = ?
+      ORDER BY e.date ASC, a.heure_debut ASC
+    ''', [utilisateurId]);
+  }
+
   // Cherche une activité du même jour où l'employé participe déjà
   // et qui chevauche l'activité demandée.
   // Renvoie le titre de la première activité en conflit, ou null.
