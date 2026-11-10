@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../modules/evenements/screens/evenement_list_screen.dart';
 import '../networking/networking_module.dart';
 import '../projets/projets_module.dart';
 import '../reservations/reservations_module.dart';
@@ -32,7 +33,7 @@ class _HomeShellState extends State<HomeShell> {
         utilisateurId: Session.utilisateurId,
         estAdmin: Session.estAdmin,
       ), // Module Networking (Manar Kalai)
-      const _ModuleAVenir(nom: 'Événements et Club', responsable: 'Louzeine Aloui'),
+      const EvenementListScreen(), // Module Événements et Club (Louzeine Aloui)
     ];
 
     return Scaffold(

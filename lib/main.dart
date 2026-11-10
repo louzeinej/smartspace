@@ -1,21 +1,22 @@
-import 'dart:io';
-
-import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
+import 'modules/evenements/entities/utilisateur_courant.dart';
 import 'providers/auth_provider.dart';
 import 'screens/splash_screen.dart';
 import 'theme/app_theme.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   // sqflite fonctionne nativement sur Android/iOS. Sur PC (Windows/Linux),
   // on passe par sqflite_common_ffi pour pouvoir tester l'appli sans téléphone.
   if (!kIsWeb && (Platform.isWindows || Platform.isLinux)) {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
   }
+  // Module Événements : charge le dernier employé choisi (sera
+  // synchronisé avec la vraie connexion dans AuthProvider).
+  await UtilisateurCourant.charger();
   runApp(const SmartSpaceApp());
 }
 
@@ -34,6 +35,3 @@ class SmartSpaceApp extends StatelessWidget {
         theme: AppTheme.light,
         home: const SplashScreen(),
       ),
-    );
-  }
-}

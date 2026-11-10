@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../core/module_access.dart';
+import '../modules/evenements/entities/utilisateur_courant.dart';
 import '../core/session.dart';
 import '../models/user_model.dart';
 import '../models/user_role.dart';
@@ -45,6 +46,8 @@ class AuthProvider extends ChangeNotifier {
         role: res.user!.role.label,
         roleIndex: res.user!.role.index,
       );
+      // Module Événements : son API lit l'id de l'utilisateur courant.
+      await UtilisateurCourant.changer(res.user!.id!);
       notifyListeners();
     }
     return res;
@@ -127,6 +130,8 @@ class AuthProvider extends ChangeNotifier {
   Future<void> logout() async {
     await _auth.logout();
     Session.deconnecter();
+    // Module Événements : réinitialise l'employé courant.
+    await UtilisateurCourant.changer(1);
     notifyListeners();
   }
 

@@ -42,10 +42,14 @@ dependencies:
   crypto: ^3.0.3             # hash SHA-256 des mots de passe
   http: ^1.2.0               # web service DiceBear (avatars)
   provider: ^6.1.2           # état de session
-  shared_preferences: ^2.2.3 # persistance de la session
+  shared_preferences: ^2.5.6 # persistance de la session
   intl: ^0.19.0              # formatage des dates
   mailer: ^6.1.2              # OTP par email via SMTP Gmail (valeur ajoutée)
   sqflite_common_ffi_web: ^1.2.1
+
+  # Module Événements (Louzeine Aloui)
+  image_picker: ^1.2.4
+  path_provider: ^2.1.6
 
 dev_dependencies:
   flutter_test:
@@ -68,6 +72,9 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  assets:
+    - assets/images/evenements/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

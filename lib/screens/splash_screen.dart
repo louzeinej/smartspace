@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
 import '../core/home_shell.dart';
+import '../modules/evenements/entities/utilisateur_courant.dart';
 import '../core/session.dart';
 import 'login_screen.dart';
 
@@ -35,6 +36,7 @@ class _SplashScreenState extends State<SplashScreen> {
         role: u.role.label,
         roleIndex: u.role.index,
       );
+      await UtilisateurCourant.changer(u.id!);
     }
     if (!mounted) return;
     Navigator.of(context).pushReplacement(MaterialPageRoute(
