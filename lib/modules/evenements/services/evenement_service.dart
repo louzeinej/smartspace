@@ -17,6 +17,19 @@ class EvenementService {
     return lignes.map((ligne) => Evenement.fromMap(ligne)).toList();
   }
 
+  // READ : lire UN événement par son id (null s'il n'existe pas)
+  Future<Evenement?> lireParId(int id) async {
+    final db = await _dbService.database;
+    final lignes = await db.query(
+      'evenements',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    if (lignes.isEmpty) return null;
+    return Evenement.fromMap(lignes.first);
+  }
+
   // UPDATE : modifier un événement
   Future<int> modifier(Evenement evenement) async {
     final db = await _dbService.database;

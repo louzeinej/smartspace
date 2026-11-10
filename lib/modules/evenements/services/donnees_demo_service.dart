@@ -1,7 +1,11 @@
 import 'dart:math';
 
+import '../entities/utilisateur_courant.dart';
 import 'database_service.dart';
 import 'participation_service.dart';
+
+// Mettre false à l'intégration pour ne pas créer les données de démo
+const bool kCreerDonneesDemo = true;
 
 // Une activité du catalogue de démo
 class _ActiviteDemo {
@@ -318,5 +322,190 @@ class DonneesDemoService {
     });
 
     return creees;
+  }
+
+  // Titre de l'événement de démonstration
+  static const String _titreDemo = 'Journée Clubs & Ateliers';
+
+  // Anciens événements de démo : supprimés pour ne pas laisser de doublons
+  static const List<String> _anciensTitresDemo = [
+    "Journée d'intégration 2026",
+    'Journée du club',
+    'Tournoi sportif interne',
+    'Semaine des clubs',
+  ];
+
+  // Date au format AAAA-MM-JJ (avec les zéros)
+  static String _formaterDate(DateTime date) {
+    final mois = date.month.toString().padLeft(2, '0');
+    final jour = date.day.toString().padLeft(2, '0');
+    return '${date.year}-$mois-$jour';
+  }
+
+  // Heure HH:MM à partir d'un nombre de minutes depuis minuit
+  // (bornée entre 00:00 et 23:59 si ça déborde)
+  static String _formaterHeure(int minutes) {
+    final borne = minutes.clamp(0, 23 * 60 + 59).toInt();
+    final heures = (borne ~/ 60).toString().padLeft(2, '0');
+    final reste = (borne % 60).toString().padLeft(2, '0');
+    return '$heures:$reste';
+  }
+
+  // Crée l'événement de démonstration "Journée Clubs & Ateliers" :
+  // un seul événement qui montre toutes les règles métier.
+  // On écrit directement dans les tables : les inscriptions à une activité
+  // terminée seraient refusées par ParticipationService.
+  Future<String> creerJeuDeTest() async {
+    final db = await DatabaseService.instance.database;
+    // "Moi" = l'employé courant au moment du clic
+    final moi = UtilisateurCourant.id;
+    final maintenant = DateTime.now();
+    final dateDuJour = _formaterDate(maintenant);
+
+    // t = l'heure actuelle arrondie à la demi-heure inférieure (en minutes)
+    final t = (maintenant.hour * 60 + maintenant.minute) ~/ 30 * 30;
+    // Raccourci : "h(1.5)" = 1 h 30 min
+    int h(double heures) => (heures * 60).round();
+
+    var dejaCree = false;
+    var nbActivites = 0;
+    var nbParticipations = 0;
+
+    // Tout se fait dans une seule transaction : tout est créé, ou rien
+    await db.transaction((txn) async {
+      // Nettoyage : anciens événements "TEST –" et anciennes démos
+      await txn.delete(
+        'evenements',
+        where: 'titre LIKE ? OR titre IN (?, ?, ?, ?)',
+        whereArgs: ['TEST –%', ..._anciensTitresDemo],
+      );
+
+      // Si la démo du jour existe déjà, on ne crée rien.
+      // Si elle date d'un autre jour, on la supprime pour la recréer.
+      final existants = await txn.query(
+        'evenements',
+        columns: ['id', 'date'],
+        where: 'titre = ?',
+        whereArgs: [_titreDemo],
+      );
+      if (existants.any((ligne) => ligne['date'] == dateDuJour)) {
+        dejaCree = true;
+        return;
+      }
+      await txn.delete(
+        'evenements',
+        where: 'titre = ?',
+        whereArgs: [_titreDemo],
+      );
+
+      // L'événement (id récupéré avec le retour de insert)
+      final evenementId = await txn.insert('evenements', {
+        'titre': _titreDemo,
+        'description':
+            "Une journée d'activités, de clubs et d'ateliers pour toute l'équipe",
+        'date': dateDuJour,
+        'lieu': 'Tunis',
+        'image': 'fete.jpg',
+      });
+
+      // Ajoute une activité et ses participations
+      // debut et fin = minutes depuis minuit ; capacite = maximum
+      // participants = liste de (id de l'employé, nombre de personnes)
+      Future<void> activite(
+        String titre,
+        int debut,
+        int fin,
+        int capacite,
+        int minimum,
+        String categorie,
+        List<(int, int)> participants,
+      ) async {
+        final activiteId = await txn.insert('activites', {
+          'evenement_id': evenementId,
+          'titre': titre,
+          'description': 'Activité proposée aux employés',
+          'heure_debut': _formaterHeure(debut),
+          'heure_fin': _formaterHeure(fin),
+          'capacite_max': capacite,
+          'capacite_min': minimum,
+          'categorie': categorie,
+        });
+        nbActivites++;
+
+        // Un seul employé par couple (activité, employé) : si "moi" est
+        // aussi un employé fictif, on additionne ses personnes
+        final parEmploye = <int, int>{};
+        for (final (employe, personnes) in participants) {
+          parEmploye.update(employe, (n) => n + personnes,
+              ifAbsent: () => personnes);
+        }
+        for (final entree in parEmploye.entries) {
+          await txn.insert('participations', {
+            'activite_id': activiteId,
+            'utilisateur_id': entree.key,
+            'date_inscription': dateDuJour,
+            'nombre_personnes': entree.value,
+          });
+          nbParticipations++;
+        }
+      }
+
+      // Terminée
+      await activite('Atelier yoga', t - h(3), t - h(2), 10, 0, 'Sport',
+          [(moi, 2), (11, 3)]);
+      // Annulée (2 personnes pour un minimum de 5)
+      await activite('Conférence bien-être', t - h(2), t - h(1), 20, 5,
+          'Formation', [(moi, 1), (11, 1)]);
+      // En cours (je ne participe pas)
+      await activite('Atelier créativité', t - h(0.5), t + h(1.5), 10, 0,
+          'Autre', [(12, 3)]);
+      // Presque complète (8/10)
+      await activite('Tournoi de padel', t + h(2), t + h(3), 10, 0, 'Sport',
+          [(11, 4), (12, 4)]);
+      // Complète (6/6)
+      await activite('Atelier cuisine', t + h(3), t + h(4), 6, 0, 'Autre',
+          [(11, 3), (12, 3)]);
+      // Ouverte (4/20)
+      await activite('Séance de méditation', t + h(4), t + h(5), 20, 0,
+          'Autre', [(13, 4)]);
+      // Minimum non atteint (il en manque 2)
+      await activite('Randonnée', t + h(2), t + h(3), 20, 5, 'Sport',
+          [(11, 2), (12, 1)]);
+      // Minimum atteint
+      await activite('Club lecture', t + h(2), t + h(3), 20, 3, 'Autre',
+          [(11, 2), (12, 2)]);
+      // Conflit d'horaires : la danse et la peinture se chevauchent
+      await activite('Atelier danse', t + h(5), t + h(6.5), 15, 0, 'Autre',
+          [(moi, 1)]);
+      await activite(
+          'Atelier peinture', t + h(5.5), t + h(7), 12, 0, 'Autre', []);
+      // Pas de conflit : ce cours commence quand la danse se termine
+      await activite(
+          'Cours de chant', t + h(6.5), t + h(7.5), 20, 0, 'Autre', []);
+    });
+
+    if (dejaCree) return 'La démo existe déjà';
+    return '1 événement, $nbActivites activités, '
+        '$nbParticipations participations créés';
+  }
+
+  // Supprime la démo ("Journée Clubs & Ateliers"), les anciennes démos
+  // et les anciens "TEST –". Leurs activités et participations partent
+  // avec eux.
+  Future<String> supprimerJeuDeTest() async {
+    final db = await DatabaseService.instance.database;
+
+    // La suppression en cascade demande que les clés étrangères soient actives
+    final reglage = await db.rawQuery('PRAGMA foreign_keys');
+    if (reglage.first.values.first != 1) {
+      await db.execute('PRAGMA foreign_keys = ON');
+    }
+
+    final supprimes = await db.delete(
+      'evenements',
+      where: 'titre LIKE ? OR titre IN (?, ?, ?, ?, ?)',
+      whereArgs: ['TEST –%', _titreDemo, ..._anciensTitresDemo],
+    );
+    return '$supprimes événement(s) de démo supprimé(s)';
   }
 }

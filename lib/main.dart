@@ -1,3 +1,7 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -14,7 +18,7 @@ Future<void> main() async {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
   }
-  // Module Événements : charge le dernier employé choisi (sera
+  // Module Événements : charge le dernier employé choisi (ensuite
   // synchronisé avec la vraie connexion dans AuthProvider).
   await UtilisateurCourant.charger();
   runApp(const SmartSpaceApp());
@@ -35,3 +39,6 @@ class SmartSpaceApp extends StatelessWidget {
         theme: AppTheme.light,
         home: const SplashScreen(),
       ),
+    );
+  }
+}

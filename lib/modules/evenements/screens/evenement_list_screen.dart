@@ -8,6 +8,7 @@ import '../services/evenement_service.dart';
 import 'evenement_detail_screen.dart';
 import 'evenement_form_screen.dart';
 import 'image_evenement.dart';
+import 'mes_inscriptions_screen.dart';
 import 'statistiques_screen.dart';
 
 class EvenementListScreen extends StatefulWidget {
@@ -22,42 +23,49 @@ class _EvenementListScreenState extends State<EvenementListScreen> {
   List<Evenement> _evenements = [];
   // Controller du défilement (partagé par la Scrollbar et la liste)
   late final ScrollController _scrollController;
-  // Le bouton "retour en haut" est visible quand on a défilé de plus de 200 px
-  bool _afficherBoutonHaut = false;
 
   @override
   void initState() {
     super.initState();
     _scrollController = ScrollController();
-    _scrollController.addListener(_surDefilement);
-    chargerEvenements();
+    _demarrer();
+  }
+
+  // Premier chargement de l'écran
+  Future<void> _demarrer() async {
+    // À SUPPRIMER avant l'intégration : crée des données de test en mode debug
+    if (kDebugMode && kCreerDonneesDemo) {
+      try {
+        await DonneesDemoService().creerJeuDeTest();
+      } catch (e) {
+        // On ignore l'erreur : l'écran doit s'afficher quand même
+      }
+    }
+    await chargerEvenements();
   }
 
   // Libère le controller quand l'écran est fermé
   @override
   void dispose() {
-    _scrollController.removeListener(_surDefilement);
     _scrollController.dispose();
     super.dispose();
   }
 
-  // Appelée à chaque défilement : on ne met à jour l'écran
-  // que si le bouton doit apparaître ou disparaître
-  void _surDefilement() {
-    // Le controller doit être attaché à une liste avant de lire sa position
-    if (!_scrollController.hasClients) return;
-    final doitEtreVisible = _scrollController.offset > 200;
-    if (doitEtreVisible != _afficherBoutonHaut) {
-      setState(() {
-        _afficherBoutonHaut = doitEtreVisible;
-      });
-    }
-  }
-
   // Remonte doucement tout en haut de la liste
-  void _remonterEnHaut() {
+  void _allerEnHaut() {
+    if (!_scrollController.hasClients) return;
     _scrollController.animateTo(
       0,
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.easeOut,
+    );
+  }
+
+  // Descend doucement tout en bas de la liste
+  void _allerEnBas() {
+    if (!_scrollController.hasClients) return;
+    _scrollController.animateTo(
+      _scrollController.position.maxScrollExtent,
       duration: const Duration(milliseconds: 400),
       curve: Curves.easeOut,
     );
@@ -72,10 +80,40 @@ class _EvenementListScreenState extends State<EvenementListScreen> {
     });
   }
 
-  // Supprime un événement puis recharge la liste
+  // Demande confirmation, puis supprime l'événement et recharge la liste
   Future<void> supprimerEvenement(Evenement evenement) async {
+    final confirme = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Supprimer l'événement ?"),
+        content: Text(
+          '« ${evenement.titre} » sera supprimé avec toutes ses activités '
+          'et toutes les inscriptions. Cette action est définitive.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFF6B6B),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Supprimer'),
+          ),
+        ],
+      ),
+    );
+    if (confirme != true) return;
+
     await _evenementService.supprimer(evenement.id!);
     await chargerEvenements();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Événement supprimé')),
+    );
   }
 
   // Ouvre le formulaire (création si evenement est null) puis recharge
@@ -161,6 +199,19 @@ class _EvenementListScreenState extends State<EvenementListScreen> {
       appBar: AppBar(
         title: const Text('Événements'),
         actions: [
+          // Mes inscriptions (visible pour tous)
+          IconButton(
+            icon: const Icon(Icons.event_available, color: Colors.white),
+            tooltip: 'Mes inscriptions',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const MesInscriptionsScreen(),
+                ),
+              );
+            },
+          ),
           // Statistiques de participation (visible pour tous)
           IconButton(
             icon: const Icon(Icons.bar_chart, color: Colors.white),
@@ -198,17 +249,25 @@ class _EvenementListScreenState extends State<EvenementListScreen> {
       floatingActionButton: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Petit bouton pour remonter en haut (visible seulement plus bas)
-          if (_afficherBoutonHaut) ...[
-            FloatingActionButton.small(
-              heroTag: 'remonter_en_haut',
-              backgroundColor: const Color(0xFF7F5AF0),
-              foregroundColor: Colors.white,
-              onPressed: _remonterEnHaut,
-              child: const Icon(Icons.arrow_upward),
-            ),
-            const SizedBox(height: 12),
-          ],
+          // Deux flèches toujours visibles : haut et bas de la liste
+          FloatingActionButton.small(
+            heroTag: 'liste_fleche_haut',
+            tooltip: 'Haut de la liste',
+            backgroundColor: const Color(0xFF7F5AF0),
+            foregroundColor: Colors.white,
+            onPressed: _allerEnHaut,
+            child: const Icon(Icons.keyboard_arrow_up),
+          ),
+          const SizedBox(height: 8),
+          FloatingActionButton.small(
+            heroTag: 'liste_fleche_bas',
+            tooltip: 'Bas de la liste',
+            backgroundColor: const Color(0xFF7F5AF0),
+            foregroundColor: Colors.white,
+            onPressed: _allerEnBas,
+            child: const Icon(Icons.keyboard_arrow_down),
+          ),
+          const SizedBox(height: 8),
           FloatingActionButton(
             heroTag: 'ajouter_evenement',
             backgroundColor: const Color(0xFF7F5AF0),
@@ -228,8 +287,9 @@ class _EvenementListScreenState extends State<EvenementListScreen> {
                 controller: _scrollController,
                 // Toujours défilable, même avec peu d'éléments
                 physics: const AlwaysScrollableScrollPhysics(),
-                // Marge en bas pour que le bouton + ne cache pas la dernière carte
-                padding: const EdgeInsets.fromLTRB(12, 12, 12, 88),
+                // Grande marge en bas : les 3 boutons ne cachent pas la
+                // corbeille de la dernière carte
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 160),
                 itemCount: _evenements.length,
                 itemBuilder: (context, index) {
                   final evenement = _evenements[index];
