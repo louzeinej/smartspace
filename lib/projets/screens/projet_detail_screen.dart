@@ -200,6 +200,7 @@ class _ProjetDetailScreenState extends State<ProjetDetailScreen> {
           ),
           floatingActionButton: peutGerer
               ? FloatingActionButton.extended(
+                  heroTag: 'projets_nouvelle_tache',
                   backgroundColor: SsColors.primaire,
                   foregroundColor: Colors.white,
                   onPressed: () => _ouvrir(TacheFormScreen(

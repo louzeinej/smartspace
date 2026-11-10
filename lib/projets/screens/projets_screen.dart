@@ -61,6 +61,8 @@ class _ProjetsScreenState extends State<ProjetsScreen> {
       backgroundColor: SsColors.fond,
       floatingActionButton: widget.service.peutCreerProjet
           ? FloatingActionButton.extended(
+              // Tag unique : les 5 modules restent montés dans un IndexedStack.
+              heroTag: 'projets_nouveau_projet',
               backgroundColor: SsColors.primaire,
               foregroundColor: Colors.white,
               onPressed: _ouvrirFormulaire,

@@ -180,6 +180,14 @@ void main() {
       expect(find.text('Le titre est obligatoire'), findsOneWidget);
     });
 
+    testWidgets('le bouton a un heroTag unique (modules montés ensemble)',
+        (t) async {
+      await afficher(t, ProjetsScreen(service: service));
+      final bouton =
+          t.widget<FloatingActionButton>(find.byType(FloatingActionButton));
+      expect(bouton.heroTag, 'projets_nouveau_projet');
+    });
+
     testWidgets('un Employé ne voit pas le bouton de création', (t) async {
       acteurCourant = const Acteur(utilisateurId: 42, role: UserRole.employe);
       await afficher(t, ProjetsScreen(service: service));
