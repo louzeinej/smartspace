@@ -18,7 +18,9 @@ class DatabaseHelper {
   static const _nom = 'smartspace.db';
   // v4 : téléphone (Utilisateurs) · v5 : jours_feries + projets/taches
   //     + networking (fusions parallèles des modules)
-  static const _version = 5;
+  // v6 : force onUpgrade sur les bases déjà en v5 (une seule des fusions
+  //      appliquée) pour créer les tables manquantes (IF NOT EXISTS).
+  static const _version = 6;
 
   Database? _db;
 
