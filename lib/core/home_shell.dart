@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../networking/networking_module.dart';
+import '../projets/projets_module.dart';
 import '../reservations/reservations_module.dart';
 import '../screens/users_screen.dart';
 import '../reservations/ui/smartspace_style.dart';
@@ -22,7 +23,7 @@ class _HomeShellState extends State<HomeShell> {
   Widget build(BuildContext context) {
     final modules = <Widget>[
       const UsersScreen(), // Module Utilisateurs (Youssef Messoudi)
-      const _ModuleAVenir(nom: 'Projets et Tâches', responsable: 'Youssef Sghaier'),
+      const ProjetsModule(), // Module Projets et Tâches (Youssef Sghaier)
       ReservationsModule(
         utilisateurId: Session.utilisateurId,
         estAdmin: Session.estAdmin,
