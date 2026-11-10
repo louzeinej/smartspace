@@ -14,8 +14,8 @@ L'application est organisée en **5 modules** accessibles depuis une barre de na
 |---|---|---|---|
 | 👤 Utilisateurs | Comptes, rôles, authentification | **Youssef Messoudi** | ✅ Intégré |
 | ✅ Projets | Projets, tâches, vérification de disponibilité | Youssef Sghaier | 🚧 À venir |
-| 🚪 Salles | Salles, réservations (création, modification, annulation), recherche par critères, alerte jours fériés | **Youssef Fadaoui** | ✅ Intégré |
-| 💬 Réseau | Publications, actualités internes | Manar Kalai | 🚧 À venir |
+| 🚪 Salles | Salles, réservations, recherche par critères | **Youssef Fadaoui** | ✅ Intégré |
+| 💬 Réseau | Publications, actualités internes | Manar Kalai | ✅ Intégré |
 | 🎉 Événements | Activités de club, participations, capacité | Louzeine Aloui | 🚧 À venir |
 
 ---

@@ -2,6 +2,7 @@ import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../database/user_database.dart';
+import '../networking/data/networking_database.dart';
 import '../reservations/data/reservation_database.dart';
 
 /// Base SQLite unique de SmartSpace, partagée par les 5 modules.
@@ -25,7 +26,10 @@ class DatabaseHelper {
       onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
       onCreate: (db, _) => _onCreate(db),
       onUpgrade: _onUpgrade,
-      onOpen: ReservationDatabase.ajouterSallesDemoSiVide,
+      onOpen: (db) async {
+        await ReservationDatabase.ajouterSallesDemoSiVide(db);
+        await NetworkingDatabase.seedDemoPublicationsIfEmpty(db);
+      },
     );
     return _db!;
   }
@@ -36,7 +40,7 @@ class DatabaseHelper {
     await UserDatabase.seedDemoUsers(db);
     // Module Projets et Tâches (Youssef Sghaier)  : à ajouter
     await ReservationDatabase.createTables(db); // Module Réservations (Youssef Fadaoui)
-    // Module Networking (Manar Kalai)             : à ajouter
+    await NetworkingDatabase.createTables(db);  // Module Networking (Manar Kalai)
     // Module Événements et Club (Louzeine Aloui)  : à ajouter
   }
 
