@@ -74,6 +74,7 @@ class _SallesAdminScreenState extends State<SallesAdminScreen> {
     return Scaffold(
       backgroundColor: SsColors.fond,
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'fab_salles',
         backgroundColor: SsColors.primaire,
         foregroundColor: Colors.white,
         onPressed: () => _ouvrirFormulaire(),

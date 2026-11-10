@@ -67,6 +67,7 @@ class _UsersScreenState extends State<UsersScreen> {
       // Création de comptes : privilège Administrateur uniquement.
       floatingActionButton: auth.canManageUsers
           ? FloatingActionButton.extended(
+            heroTag: 'fab_utilisateurs',
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
               icon: const Icon(Icons.person_add_rounded),

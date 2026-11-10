@@ -61,6 +61,7 @@ class _ProjetsScreenState extends State<ProjetsScreen> {
       backgroundColor: SsColors.fond,
       floatingActionButton: widget.service.peutCreerProjet
           ? FloatingActionButton.extended(
+            heroTag: 'fab_projets',
               backgroundColor: SsColors.primaire,
               foregroundColor: Colors.white,
               onPressed: _ouvrirFormulaire,

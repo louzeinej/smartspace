@@ -271,6 +271,7 @@ class _NetworkingModuleState extends State<NetworkingModule> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'fab_networking',
         onPressed: _openCreateSheet,
         backgroundColor: SsColors.primaire,
         foregroundColor: Colors.white,
