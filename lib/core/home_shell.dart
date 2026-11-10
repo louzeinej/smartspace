@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../networking/networking_module.dart';
 import '../reservations/reservations_module.dart';
 import '../screens/users_screen.dart';
 import '../reservations/ui/smartspace_style.dart';
@@ -26,7 +27,10 @@ class _HomeShellState extends State<HomeShell> {
         utilisateurId: Session.utilisateurId,
         estAdmin: Session.estAdmin,
       ),
-      const _ModuleAVenir(nom: 'Networking', responsable: 'Manar Kalai'),
+      NetworkingModule(
+        utilisateurId: Session.utilisateurId,
+        estAdmin: Session.estAdmin,
+      ), // Module Networking (Manar Kalai)
       const _ModuleAVenir(nom: 'Événements et Club', responsable: 'Louzeine Aloui'),
     ];
 
