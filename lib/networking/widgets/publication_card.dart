@@ -4,10 +4,11 @@ import '../../models/user_role.dart';
 import '../../widgets/avatar_widget.dart';
 import '../../widgets/role_badge.dart';
 import '../models/publication.dart';
+import '../services/link_preview_service.dart';
 import '../ui/networking_style.dart';
 
 /// Carte représentant une publication avec adaptation dynamique selon son type
-/// (Sondage, Formation, Kudos, Annonce, Actualité).
+/// (Sondage, Formation, Kudos, Annonce, Actualité, Marque-page, Lien Web).
 class PublicationCard extends StatelessWidget {
   const PublicationCard({
     super.key,
@@ -18,6 +19,7 @@ class PublicationCard extends StatelessWidget {
     required this.onCommentTap,
     required this.onVotePoll,
     required this.onToggleEnroll,
+    required this.onToggleBookmark,
     required this.onEdit,
     required this.onDelete,
     required this.onTogglePin,
@@ -31,6 +33,7 @@ class PublicationCard extends StatelessWidget {
   final VoidCallback onCommentTap;
   final Function(int optionId) onVotePoll;
   final VoidCallback onToggleEnroll;
+  final VoidCallback onToggleBookmark;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final VoidCallback onTogglePin;
@@ -42,6 +45,7 @@ class PublicationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isKudos = publication.type == PublicationType.kudos;
+    final detectedUrl = LinkPreviewService.extractFirstUrl('${publication.titre} ${publication.contenu}');
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -104,6 +108,10 @@ class PublicationCard extends StatelessWidget {
                   publication.contenu,
                   style: const TextStyle(fontSize: 14, color: Color(0xFF333333), height: 1.4),
                 ),
+
+                // Link Preview Card if a URL is detected
+                if (detectedUrl != null) _buildLinkPreviewWidget(context, detectedUrl),
+
                 const SizedBox(height: 12),
 
                 // Line 4: Specific Rich Interactive Layouts
@@ -113,7 +121,7 @@ class PublicationCard extends StatelessWidget {
 
                 const Divider(height: 24, thickness: 0.8),
 
-                // Line 5: Bottom Action Bar (Like, Comment, Stats)
+                // Line 5: Bottom Action Bar (Like, Comment, Bookmark, Stats)
                 _buildActionBar(context),
               ],
             ),
@@ -251,6 +259,47 @@ class PublicationCard extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildLinkPreviewWidget(BuildContext context, String url) {
+    final domain = LinkPreviewService.extractDomain(url);
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3EDFF),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: SsColors.primaire.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.language_rounded, color: SsColors.primaire, size: 22),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Lien Web • $domain',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                    color: SsColors.primaire,
+                  ),
+                ),
+                Text(
+                  url,
+                  style: const TextStyle(fontSize: 11, color: Colors.blueAccent),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          const Icon(Icons.open_in_new_rounded, size: 16, color: SsColors.primaire),
+        ],
+      ),
     );
   }
 
@@ -492,7 +541,7 @@ class PublicationCard extends StatelessWidget {
           onTap: onLike,
           borderRadius: BorderRadius.circular(20),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
             child: Row(
               children: [
                 Icon(
@@ -504,7 +553,7 @@ class PublicationCard extends StatelessWidget {
                       : Colors.grey.shade600,
                   size: 20,
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 4),
                 Text(
                   '${publication.likesCount}',
                   style: TextStyle(
@@ -525,13 +574,13 @@ class PublicationCard extends StatelessWidget {
           onTap: onCommentTap,
           borderRadius: BorderRadius.circular(20),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
             child: Row(
               children: [
                 const Icon(Icons.chat_bubble_outline_rounded, color: Colors.grey, size: 20),
-                const SizedBox(width: 6),
+                const SizedBox(width: 4),
                 Text(
-                  '${publication.commentsCount} coms',
+                  '${publication.commentsCount}',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
@@ -539,6 +588,24 @@ class PublicationCard extends StatelessWidget {
                   ),
                 ),
               ],
+            ),
+          ),
+        ),
+
+        // Bookmark Button
+        InkWell(
+          onTap: onToggleBookmark,
+          borderRadius: BorderRadius.circular(20),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+            child: Icon(
+              publication.isBookmarked
+                  ? Icons.bookmark_rounded
+                  : Icons.bookmark_border_rounded,
+              color: publication.isBookmarked
+                  ? SsColors.primaire
+                  : Colors.grey.shade600,
+              size: 20,
             ),
           ),
         ),

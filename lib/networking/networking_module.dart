@@ -6,6 +6,7 @@ import 'services/networking_service.dart';
 import 'ui/networking_style.dart';
 import 'widgets/comments_bottom_sheet.dart';
 import 'widgets/create_publication_sheet.dart';
+import 'widgets/kudos_leaderboard_sheet.dart';
 import 'widgets/publication_card.dart';
 
 /// Module principal « Gestion Networking » (Réseau social interne / Mini-LinkedIn).
@@ -37,6 +38,7 @@ class _NetworkingModuleState extends State<NetworkingModule> {
 
   final List<String> _filters = [
     'Tout',
+    'Mes Favoris 🔖',
     'Annonces 📌',
     'Actualités',
     'Formations 🎓',
@@ -70,6 +72,24 @@ class _NetworkingModuleState extends State<NetworkingModule> {
   Future<void> _handleLike(Publication pub) async {
     if (pub.id == null) return;
     await _service.toggleLike(pub.id!, widget.utilisateurId);
+    await _chargerPublications();
+  }
+
+  Future<void> _handleToggleBookmark(Publication pub) async {
+    if (pub.id == null) return;
+    final isBookmarked = await _service.toggleBookmark(pub.id!, widget.utilisateurId);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isBookmarked
+                ? 'Publication ajoutée à vos Favoris !'
+                : 'Publication retirée de vos Favoris.',
+          ),
+          backgroundColor: isBookmarked ? SsColors.primaire : Colors.grey,
+        ),
+      );
+    }
     await _chargerPublications();
   }
 
@@ -177,6 +197,15 @@ class _NetworkingModuleState extends State<NetworkingModule> {
     );
   }
 
+  void _openLeaderboard() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => KudosLeaderboardSheet(service: _service),
+    );
+  }
+
   void _showParticipantsModal(Publication pub) async {
     if (pub.id == null) return;
     final list = await _service.getTrainingParticipants(pub.id!);
@@ -199,7 +228,7 @@ class _NetworkingModuleState extends State<NetworkingModule> {
                       leading: CircleAvatar(
                         backgroundColor: SsColors.primaire,
                         child: Text(
-                          (item['nom'] as String).isNotEmpty
+                          ((item['nom'] as String?) ?? '').isNotEmpty
                               ? (item['nom'] as String)[0].toUpperCase()
                               : '?',
                           style: const TextStyle(color: Colors.white),
@@ -214,6 +243,22 @@ class _NetworkingModuleState extends State<NetworkingModule> {
                 ),
         ),
         actions: [
+          if (list.isNotEmpty)
+            TextButton.icon(
+              icon: const Icon(Icons.download_rounded, color: SsColors.primaire),
+              label: const Text('Exporter CSV'),
+              onPressed: () {
+                final csvData = _service.exportParticipantsToCsv(list);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Candidats exportés (${list.length} inscrits) !\n$csvData'),
+                    backgroundColor: SsColors.succes,
+                    duration: const Duration(seconds: 4),
+                  ),
+                );
+                Navigator.pop(ctx);
+              },
+            ),
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: const Text('Fermer'),
@@ -238,6 +283,11 @@ class _NetworkingModuleState extends State<NetworkingModule> {
         foregroundColor: Colors.white,
         title: const Text('Réseau Interne SmartSpace'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.emoji_events_rounded, color: Colors.amber),
+            tooltip: 'Tableau d\'Honneur Kudos',
+            onPressed: _openLeaderboard,
+          ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.sort_rounded, color: Colors.white),
             tooltip: 'Trier par',
@@ -271,7 +321,6 @@ class _NetworkingModuleState extends State<NetworkingModule> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'fab_networking',
         onPressed: _openCreateSheet,
         backgroundColor: SsColors.primaire,
         foregroundColor: Colors.white,
@@ -385,6 +434,7 @@ class _NetworkingModuleState extends State<NetworkingModule> {
                                 onCommentTap: () => _openComments(pub),
                                 onVotePoll: (optId) => _handleVotePoll(pub, optId),
                                 onToggleEnroll: () => _handleToggleEnroll(pub),
+                                onToggleBookmark: () => _handleToggleBookmark(pub),
                                 onEdit: () => _openEditSheet(pub),
                                 onDelete: () => _handleDelete(pub),
                                 onTogglePin: () => _handleTogglePin(pub),

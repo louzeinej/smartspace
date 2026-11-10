@@ -73,6 +73,16 @@ class NetworkingDatabase {
       )
     ''');
 
+    // 6. Table pour les favoris / marque-pages (Bookmarks)
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS publication_bookmarks (
+        publication_id INTEGER NOT NULL REFERENCES publications(id) ON DELETE CASCADE,
+        utilisateur_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        date_ajout TEXT NOT NULL,
+        PRIMARY KEY (publication_id, utilisateur_id)
+      )
+    ''');
+
     await db.execute('CREATE INDEX IF NOT EXISTS idx_pub_type ON publications(type)');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_pub_pinned ON publications(is_pinned)');
   }

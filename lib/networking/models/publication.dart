@@ -146,6 +146,7 @@ class Publication {
   final int likesCount;
   final int commentsCount;
   final bool isLikedByCurrentUser;
+  final bool isBookmarked;
 
   // Author details (from JOIN)
   final String? auteurNom;
@@ -180,6 +181,7 @@ class Publication {
     this.likesCount = 0,
     this.commentsCount = 0,
     this.isLikedByCurrentUser = false,
+    this.isBookmarked = false,
     this.auteurNom,
     this.auteurEmail,
     this.auteurRole,
@@ -203,6 +205,7 @@ class Publication {
   factory Publication.fromMap(Map<String, dynamic> map, {
     bool isLiked = false,
     bool isEnrolled = false,
+    bool isBookmarked = false,
     int commentsCount = 0,
     List<PollOption> pollOptions = const [],
     int? userVotedOptionId,
@@ -226,6 +229,7 @@ class Publication {
       likesCount: (map['likes_count'] as int?) ?? 0,
       commentsCount: commentsCount,
       isLikedByCurrentUser: isLiked,
+      isBookmarked: isBookmarked,
       auteurNom: map['auteur_nom'] as String?,
       auteurEmail: map['auteur_email'] as String?,
       auteurRole: role,

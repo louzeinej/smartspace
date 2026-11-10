@@ -1,5 +1,6 @@
 import 'package:sqflite/sqflite.dart';
 import '../../core/database_helper.dart';
+import '../../models/user_role.dart';
 import '../models/publication.dart';
 
 /// Service gérant toute la logique métier et les requêtes SQL du module Networking.
@@ -18,9 +19,13 @@ class NetworkingService {
     String whereClause = '1=1';
     final List<dynamic> whereArgs = [];
 
-    // Filtre par type de publication
+    // Filtre par type de publication ou par favoris
     if (filterType != null && filterType.isNotEmpty && filterType != 'Tout') {
-      if (filterType.contains('Annonce')) {
+      if (filterType.contains('Favoris') && currentUserId != null) {
+        whereClause +=
+            ' AND p.id IN (SELECT publication_id FROM publication_bookmarks WHERE utilisateur_id = ?)';
+        whereArgs.add(currentUserId);
+      } else if (filterType.contains('Annonce')) {
         whereClause += ' AND (p.type = ? OR p.is_pinned = 1)';
         whereArgs.add(PublicationType.annonce);
       } else if (filterType.contains('Actualité')) {
@@ -77,7 +82,18 @@ class NetworkingService {
         isLiked = likeRes.isNotEmpty;
       }
 
-      // 2. Compter les commentaires
+      // 2. Vérifier si mis en marque-page/favori
+      bool isBookmarked = false;
+      if (currentUserId != null) {
+        final bRes = await db.query(
+          'publication_bookmarks',
+          where: 'publication_id = ? AND utilisateur_id = ?',
+          whereArgs: [pubId, currentUserId],
+        );
+        isBookmarked = bRes.isNotEmpty;
+      }
+
+      // 3. Compter les commentaires
       final commentCountRes = Sqflite.firstIntValue(
             await db.rawQuery(
               'SELECT COUNT(*) FROM publication_comments WHERE publication_id = ?',
@@ -86,7 +102,7 @@ class NetworkingService {
           ) ??
           0;
 
-      // 3. Traiter les données de sondage si type = Sondage
+      // 4. Traiter les données de sondage si type = Sondage
       List<PollOption> pollOptions = [];
       int? userVotedOptionId;
       int totalPollVotes = 0;
@@ -114,7 +130,7 @@ class NetworkingService {
         }
       }
 
-      // 4. Traiter l'inscription formation si type = Formation
+      // 5. Traiter l'inscription formation si type = Formation
       bool isEnrolled = false;
       if (map['type'] == PublicationType.formation && currentUserId != null) {
         final enrollRes = await db.query(
@@ -129,6 +145,7 @@ class NetworkingService {
         map,
         isLiked: isLiked,
         isEnrolled: isEnrolled,
+        isBookmarked: isBookmarked,
         commentsCount: commentCountRes,
         pollOptions: pollOptions,
         userVotedOptionId: userVotedOptionId,
@@ -144,6 +161,65 @@ class NetworkingService {
     }
 
     return result;
+  }
+
+  /// Toggle Marque-page / Favori (Bookmarks)
+  Future<bool> toggleBookmark(int pubId, int userId) async {
+    final db = await _dbHelper.database;
+    final existing = await db.query(
+      'publication_bookmarks',
+      where: 'publication_id = ? AND utilisateur_id = ?',
+      whereArgs: [pubId, userId],
+    );
+
+    if (existing.isNotEmpty) {
+      await db.delete(
+        'publication_bookmarks',
+        where: 'publication_id = ? AND utilisateur_id = ?',
+        whereArgs: [pubId, userId],
+      );
+      return false;
+    } else {
+      await db.insert('publication_bookmarks', {
+        'publication_id': pubId,
+        'utilisateur_id': userId,
+        'date_ajout': DateTime.now().toIso8601String(),
+      });
+      return true;
+    }
+  }
+
+  /// Récupère le classement du Tableau d'Honneur (Kudos Leaderboard)
+  Future<List<Map<String, dynamic>>> getKudosLeaderboard() async {
+    final db = await _dbHelper.database;
+    return await db.rawQuery('''
+      SELECT
+        u.id,
+        u.fullName AS nom,
+        u.email,
+        u.roleIndex,
+        u.avatarSeed,
+        COUNT(p.id) AS kudos_count
+      FROM publications p
+      INNER JOIN users u ON p.kudos_destinataire_id = u.id
+      WHERE p.type = 'Kudos'
+      GROUP BY u.id
+      ORDER BY kudos_count DESC
+      LIMIT 10
+    ''');
+  }
+
+  /// Exporte la liste des participants à une formation sous format CSV texte
+  String exportParticipantsToCsv(List<Map<String, dynamic>> participants) {
+    final StringBuffer buffer = StringBuffer();
+    buffer.writeln('Nom,Email,Rôle,Date Inscription');
+    for (final p in participants) {
+      final roleEnum = UserRole.fromIndex((p['roleIndex'] as int?) ?? 4);
+      final nom = ((p['nom'] as String?) ?? '').replaceAll('"', '""');
+      final email = ((p['email'] as String?) ?? '').replaceAll('"', '""');
+      buffer.writeln('"$nom","$email","${roleEnum.label}","${p['date_inscription']}"');
+    }
+    return buffer.toString();
   }
 
   /// Créer une nouvelle publication (avec options de sondage facultatives)
