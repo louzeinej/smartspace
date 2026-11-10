@@ -134,6 +134,42 @@ String formatDate(DateTime d) =>
 String formatHeure(TimeOfDay t) =>
     '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
 
+/// yyyy-MM-dd -> DateTime.
+DateTime lireDate(String iso) => DateTime.parse(iso);
+
+/// HH:mm -> TimeOfDay.
+TimeOfDay lireHeure(String hhmm) {
+  final p = hhmm.split(':');
+  return TimeOfDay(hour: int.parse(p[0]), minute: int.parse(p[1]));
+}
+
+/// Bandeau d'avertissement « jour férié » (donnée de l'API Nager.Date).
+class SsAlerteFerie extends StatelessWidget {
+  const SsAlerteFerie({super.key, required this.nom});
+  final String nom;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0x1AFF6B6B),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: SsColors.alerte),
+      ),
+      child: Row(children: [
+        const Icon(Icons.celebration_outlined, color: SsColors.alerte),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text('Jour férié : $nom. Vérifiez que les locaux sont ouverts.',
+              style: SsText.courant.copyWith(color: SsColors.secondaire)),
+        ),
+      ]),
+    );
+  }
+}
+
 /// yyyy-MM-dd -> dd/MM/yyyy pour l'affichage.
 String afficherDate(String iso) {
   final p = iso.split('-');

@@ -30,6 +30,14 @@ class ReservationDatabase {
     ''');
     await db.execute(
         'CREATE INDEX IF NOT EXISTS idx_resa_salle_date ON reservations(salle_id, date)');
+    // Cache local des jours fériés reçus de l'API Nager.Date.
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS jours_feries (
+        date TEXT PRIMARY KEY,
+        nom TEXT NOT NULL,
+        annee INTEGER NOT NULL
+      )
+    ''');
   }
 
   /// Données de démonstration : si aucune salle n'existe, on en crée trois
