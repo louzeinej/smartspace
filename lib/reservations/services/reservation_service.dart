@@ -12,6 +12,15 @@ class SalleResultat {
   bool get disponible => conflit == null;
 }
 
+/// Proposition de remplacement quand aucune salle n'est libre :
+/// une salle et un créneau de même durée, le même jour.
+class CreneauAlternatif {
+  final Salle salle;
+  final String heureDebut;
+  final String heureFin;
+  CreneauAlternatif(this.salle, this.heureDebut, this.heureFin);
+}
+
 class ReservationException implements Exception {
   final String message;
   ReservationException(this.message);
@@ -130,6 +139,92 @@ class ReservationService {
       });
     return res;
   }
+
+  // ------------------------------------- Métier avancé : créneaux alternatifs
+
+  /// Heures d'ouverture des locaux et pas de recherche (minutes).
+  static const ouverture = '08:00';
+  static const fermeture = '19:00';
+  static const pasMinutes = 30;
+
+  /// Quand le créneau demandé est complet, propose jusqu'à [max] créneaux
+  /// libres de MÊME DURÉE, le MÊME JOUR, entre [ouverture] et [fermeture],
+  /// classés du plus proche au plus éloigné de l'heure demandée.
+  ///
+  /// Algorithme :
+  /// 1. 2 requêtes SQL : salles assez grandes + réservations du jour.
+  /// 2. On teste chaque heure de début possible (pas de 30 min).
+  /// 3. Pour chaque début, on garde la plus petite salle sans chevauchement
+  ///    (même règle : debutA < finB ET finA > debutB).
+  /// 4. Tri par écart avec l'heure demandée, puis par heure.
+  ///
+  /// [maintenant] (HH:mm) exclut les créneaux déjà passés si [date] est
+  /// aujourd'hui.
+  Future<List<CreneauAlternatif>> proposerCreneauxAlternatifs({
+    required String date,
+    required String heureDebut,
+    required String heureFin,
+    required int nbPersonnes,
+    String? maintenant,
+    int max = 5,
+  }) async {
+    _verifierCreneau(heureDebut, heureFin);
+    final db = await _database;
+
+    // 1. Données nécessaires, lues une seule fois.
+    final salles = (await db.query('salles',
+            where: 'capacite >= ?',
+            whereArgs: [nbPersonnes],
+            orderBy: 'capacite ASC, numero ASC'))
+        .map(Salle.fromMap)
+        .toList();
+    if (salles.isEmpty) return [];
+    final occupations = await db.query('reservations',
+        columns: ['salle_id', 'heure_debut', 'heure_fin'],
+        where: 'date = ?',
+        whereArgs: [date]);
+
+    final debutDemande = _enMinutes(heureDebut);
+    final duree = _enMinutes(heureFin) - debutDemande;
+    final premier = _enMinutes(ouverture);
+    final dernier = _enMinutes(fermeture) - duree;
+    final limitePassee = maintenant == null ? -1 : _enMinutes(maintenant);
+
+    // 2-3. Chaque début possible -> plus petite salle libre.
+    final propositions = <CreneauAlternatif>[];
+    for (var debut = premier; debut <= dernier; debut += pasMinutes) {
+      if (debut == debutDemande || debut < limitePassee) continue;
+      final hDebut = _enHeure(debut);
+      final hFin = _enHeure(debut + duree);
+      for (final salle in salles) {
+        final occupee = occupations.any((o) =>
+            o['salle_id'] == salle.id &&
+            (o['heure_debut'] as String).compareTo(hFin) < 0 &&
+            (o['heure_fin'] as String).compareTo(hDebut) > 0);
+        if (!occupee) {
+          propositions.add(CreneauAlternatif(salle, hDebut, hFin));
+          break; // la plus petite salle suffit pour ce créneau
+        }
+      }
+    }
+
+    // 4. Les plus proches de l'heure demandée d'abord.
+    propositions.sort((a, b) {
+      final ea = (_enMinutes(a.heureDebut) - debutDemande).abs();
+      final eb = (_enMinutes(b.heureDebut) - debutDemande).abs();
+      return ea != eb ? ea.compareTo(eb) : a.heureDebut.compareTo(b.heureDebut);
+    });
+    return propositions.take(max).toList();
+  }
+
+  static int _enMinutes(String hhmm) {
+    final p = hhmm.split(':');
+    return int.parse(p[0]) * 60 + int.parse(p[1]);
+  }
+
+  static String _enHeure(int minutes) =>
+      '${(minutes ~/ 60).toString().padLeft(2, '0')}:'
+      '${(minutes % 60).toString().padLeft(2, '0')}';
 
   /// Réservations à venir (aujourd'hui inclus) de toutes les salles,
   /// regroupées par id de salle.

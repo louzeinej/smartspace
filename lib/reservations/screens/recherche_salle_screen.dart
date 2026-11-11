@@ -33,6 +33,8 @@ class _RechercheSalleScreenState extends State<RechercheSalleScreen> {
   TimeOfDay _fin = const TimeOfDay(hour: 10, minute: 0);
 
   Future<List<SalleResultat>>? _resultats;
+  // Métier avancé : créneaux proposés si le créneau demandé est complet.
+  Future<List<CreneauAlternatif>>? _alternatives;
   // Critères figés au moment de la recherche (ceux réellement utilisés).
   String? _rDate, _rDebut, _rFin;
   int? _rNb;
@@ -119,15 +121,28 @@ class _RechercheSalleScreenState extends State<RechercheSalleScreen> {
         heureFin: _rFin!,
         nbPersonnes: _rNb!,
       );
+      // Exclut les créneaux déjà passés si la date est aujourd'hui.
+      final now = DateTime.now();
+      final estAujourdhui = _rDate == formatDate(now);
+      _alternatives = widget.service.proposerCreneauxAlternatifs(
+        date: _rDate!,
+        heureDebut: _rDebut!,
+        heureFin: _rFin!,
+        nbPersonnes: _rNb!,
+        maintenant: estAujourdhui ? formatHeure(TimeOfDay.fromDateTime(now)) : null,
+      );
     });
   }
 
-  Future<void> _reserver(Salle salle) async {
+  /// [debut]/[fin] : créneau alternatif choisi (sinon le créneau recherché).
+  Future<void> _reserver(Salle salle, {String? debut, String? fin}) async {
+    final hDebut = debut ?? _rDebut!;
+    final hFin = fin ?? _rFin!;
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('Réserver la salle ${salle.numero} ?'),
-        content: Text('${afficherDate(_rDate!)} de $_rDebut à $_rFin\n'
+        content: Text('${afficherDate(_rDate!)} de $hDebut à $hFin\n'
             '${_objet.text.trim()} — $_rNb personne(s)'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
@@ -142,12 +157,12 @@ class _RechercheSalleScreenState extends State<RechercheSalleScreen> {
         utilisateurId: widget.utilisateurId,
         objet: _objet.text.trim(),
         date: _rDate!,
-        heureDebut: _rDebut!,
-        heureFin: _rFin!,
+        heureDebut: hDebut,
+        heureFin: hFin,
         nbPersonnes: _rNb!,
       ));
       if (!mounted) return;
-      ssMessage(context, 'Salle ${salle.numero} réservée');
+      ssMessage(context, 'Salle ${salle.numero} réservée de $hDebut à $hFin');
       widget.onReservee?.call();
       _rechercher(); // rafraîchit : la salle n'est plus proposée
     } on ReservationException catch (e) {
@@ -311,12 +326,77 @@ class _RechercheSalleScreenState extends State<RechercheSalleScreen> {
                         );
                       },
                     ),
+                    if (nbDispo == 0) _blocAlternatives(),
                   ],
                 );
               },
             ),
         ],
       ),
+    );
+  }
+
+  /// Métier avancé : créneaux libres proposés quand tout est réservé.
+  Widget _blocAlternatives() {
+    return FutureBuilder<List<CreneauAlternatif>>(
+      future: _alternatives,
+      builder: (context, snap) {
+        if (snap.connectionState != ConnectionState.done) {
+          return const Padding(
+            padding: EdgeInsets.all(16),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+        final props = snap.data ?? const <CreneauAlternatif>[];
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 16),
+            const Row(children: [
+              Icon(Icons.auto_awesome, color: SsColors.primaire),
+              SizedBox(width: 8),
+              Text('Créneaux alternatifs le même jour', style: SsText.titreCarte),
+            ]),
+            const SizedBox(height: 4),
+            Text(
+                'Même durée, entre ${ReservationService.ouverture} et '
+                '${ReservationService.fermeture}, du plus proche au plus éloigné.',
+                style: SsText.secondaire),
+            const SizedBox(height: 10),
+            if (props.isEmpty)
+              const SsCarte(
+                child: Text('Aucun créneau libre ce jour-là. Essayez une autre date.',
+                    style: SsText.courant),
+              ),
+            for (final p in props)
+              SsCarte(
+                child: Row(children: [
+                  const Icon(Icons.schedule, color: SsColors.succes),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('${p.heureDebut} – ${p.heureFin}',
+                            style: SsText.titreCarte),
+                        Text(
+                            'Salle ${p.salle.numero} · ${p.salle.emplacement} · '
+                            '${p.salle.capacite} places',
+                            style: SsText.secondaire),
+                      ],
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () =>
+                        _reserver(p.salle, debut: p.heureDebut, fin: p.heureFin),
+                    child: const Text('Réserver',
+                        style: TextStyle(color: SsColors.primaire)),
+                  ),
+                ]),
+              ),
+          ],
+        );
+      },
     );
   }
 }
