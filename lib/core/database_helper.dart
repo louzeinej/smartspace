@@ -20,7 +20,8 @@ class DatabaseHelper {
   //     + networking (fusions parallèles des modules)
   // v6 : force onUpgrade sur les bases déjà en v5 (une seule des fusions
   //      appliquée) pour créer les tables manquantes (IF NOT EXISTS).
-  static const _version = 6;
+  // v7 : publication_bookmarks (Networking)
+  static const _version = 7;
 
   Database? _db;
 
